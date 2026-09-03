@@ -15,6 +15,16 @@ const { execFileSync } = require('child_process');
 const APP = path.join(__dirname, '..');
 const REPO = path.join(APP, '..');
 
+// 送信時のオプション。
+// 古いgitとHTTP/2の組み合わせで "RPC failed; HTTP 400" が出ることがあるため、
+// HTTP/1.1 を明示し、送信バッファを大きくしています。
+const HTTP_OPTS = [
+  '-c', 'http.version=HTTP/1.1',
+  '-c', 'http.postBuffer=524288000',
+  '-c', 'http.lowSpeedLimit=0',
+  '-c', 'http.lowSpeedTime=999',
+];
+
 function git(args, opts) {
   return execFileSync('git', args, {
     cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
@@ -152,9 +162,21 @@ function push(message) {
   }
 
   const branch = tryGit(['branch', '--show-current']).out || 'main';
-  let r = tryGit(['push', 'origin', branch], { timeout: 180000 });
-  if (!r.ok && /no upstream|set-upstream/i.test(r.out)) {
-    r = tryGit(['push', '-u', 'origin', branch], { timeout: 180000 });
+  let r = tryGit(HTTP_OPTS.concat(['push', '-u', 'origin', branch]), { timeout: 600000 });
+
+  // 一度で送れないときは、コミットを1つずつ送り直します。
+  // 大きなpushが途中で切れる回線でも、小分けなら通ることがあります。
+  if (!r.ok && /HTTP 400|RPC failed|hung up|early EOF/i.test(r.out)) {
+    log.push('一度で送れなかったため、小分けにして送り直します…');
+    const commits = tryGit(['rev-list', '--reverse', branch]).out.split('\n').filter(Boolean);
+    let sent = false;
+    for (const c of commits) {
+      const ref = c + ':refs/heads/' + branch;
+      const step = tryGit(HTTP_OPTS.concat(['push', '-u', 'origin', ref]), { timeout: 600000 });
+      if (!step.ok) { r = step; sent = false; break; }
+      sent = true;
+    }
+    if (sent) r = { ok: true, out: '' };
   }
   if (!r.ok) throw new Error(explainPushError(r.out));
 
@@ -172,6 +194,11 @@ function explainPushError(raw) {
   }
   if (/Could not resolve host|network|timed out/i.test(t)) {
     return 'GitHubに接続できませんでした。ネットワークを確認して、もう一度お試しください。\n\n' + t;
+  }
+  if (/HTTP 400|RPC failed|hung up|early EOF/i.test(t)) {
+    return 'GitHubへの送信が途中で切れました。一度に送る量が多いときや、回線が不安定なときに起こります。\n'
+      + 'もう一度「サイトに反映する」を押すと、続きから送れることがあります。\n'
+      + '繰り返し失敗する場合は、SSH接続に切り替えると安定します。\n\n' + t;
   }
   if (/rejected|non-fast-forward|fetch first/i.test(t)) {
     return 'GitHub側に、手元にない変更があります。ターミナルで `git pull --rebase` を実行してから、'
