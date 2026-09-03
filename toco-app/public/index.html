@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>tocoとくらし 記事制作アプリ</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+
+<!-- ============ メニュー ============ -->
+<aside class="side">
+  <div class="brand"><b>tocoとくらし</b><small>記事制作アプリ</small></div>
+  <button class="nav on" data-view="home"><span class="ic">◉</span>ホーム</button>
+  <button class="nav" data-view="ideas"><span class="ic">✎</span>記事ネタ<span class="tail" id="navIdeas" hidden></span></button>
+  <button class="nav" data-view="articles"><span class="ic">▤</span>記事<span class="tail" id="navArticles" hidden></span></button>
+  <button class="nav" data-view="inventory"><span class="ic">☖</span>持ちもの台帳</button>
+  <div class="sep"></div>
+  <button class="nav" data-view="publish"><span class="ic">↥</span>公開<span class="tail" id="navPublish" hidden></span></button>
+  <button class="nav" data-view="settings"><span class="ic">⚙</span>設定</button>
+  <div class="sidefoot">
+    <a href="https://toco-to.com/" target="_blank">toco-to.com</a><br>
+    <span id="sideState">—</span>
+  </div>
+</aside>
+
+<main class="main">
+
+<!-- ============ ホーム ============ -->
+<section id="view-home" class="view on">
+  <div class="vh"><h1>ホーム</h1><span class="sub" id="homeDate"></span></div>
+  <div id="homeDeploy"></div>
+  <div class="stats" id="homeStats"></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>作業中の記事</h3>
+      <p class="note">書きかけの記事です。続きから再開できます。</p>
+      <div id="homeWorking"></div>
+    </div>
+    <div class="card">
+      <h3>気づいたことをメモ</h3>
+      <p class="note">思いついたときに書き足しておくと、記事を書くときの材料になります。</p>
+      <label>どの用品について<select id="homeNoteItem"></select></label>
+      <label>気づいたこと<textarea id="homeNoteText" rows="3" placeholder="例：牧草入れの位置を下げたら食べる量が増えた"></textarea></label>
+      <div class="row end"><button class="primary" id="homeNoteSave">メモを残す</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 記事ネタ ============ -->
+<section id="view-ideas" class="view">
+  <div class="vh"><h1>記事ネタ</h1><span class="sub" id="ideaCount"></span>
+    <span class="spacer"></span>
+    <button class="ghost" id="btnIdeaBulk">まとめて追加</button>
+    <button class="primary" id="btnIdeaNew">ネタを追加</button></div>
+  <div class="card">
+    <div class="row">
+      <select id="fCategory"><option value="">カテゴリ すべて</option></select>
+      <select id="fStatus"><option value="">状態 すべて</option><option>未着手</option><option>作成中</option><option>公開</option></select>
+      <select id="fPriority"><option value="">優先度 すべて</option><option>高</option><option>中</option><option>低</option></select>
+    </div>
+  </div>
+  <div id="ideaList"></div>
+</section>
+
+<!-- ============ 記事一覧 ============ -->
+<section id="view-articles" class="view">
+  <div class="vh"><h1>記事</h1><span class="sub" id="artCount"></span>
+    <span class="spacer"></span>
+    <button class="primary" id="btnNewArticle">新しい記事</button></div>
+  <div id="articleList"></div>
+</section>
+
+<!-- ============ 記事の詳細 ============ -->
+<section id="view-editor" class="view">
+  <div class="vh">
+    <button class="ghost" id="btnBackList">‹ 一覧へ</button>
+    <h1 id="edTitle">　</h1>
+    <span class="sub" id="edMeta"></span>
+    <span class="spacer"></span>
+    <button class="ghost danger" id="btnDeleteProject">削除</button>
+  </div>
+
+  <div class="steps">
+    <button class="step on" data-step="1"><span class="n">1</span>商品を選ぶ</button>
+    <button class="step" data-step="2"><span class="n">2</span>本文を書く</button>
+    <button class="step" data-step="3"><span class="n">3</span>公開前チェック</button>
+    <button class="step" data-step="4"><span class="n">4</span>公開の設定</button>
+  </div>
+
+  <!-- ステップ1 -->
+  <div class="stepbox" data-box="1">
+    <div class="card">
+      <h3>楽天で商品を探す</h3>
+      <p class="note">レビュー件数の多い順に並びます。持ちもの台帳にある商品には印が付きます。</p>
+      <div class="inline">
+        <label>キーワード<input id="searchKeyword" placeholder="うさぎ ケージ"></label>
+        <button class="primary" id="btnSearch">検索</button>
+        <button class="ghost" id="btnManualAdd">手入力で追加</button>
+      </div>
+      <p class="note" id="searchNote"></p>
+      <div id="searchResults" class="list"></div>
+    </div>
+    <div class="card">
+      <h3>この記事に載せる商品 <span class="tag" id="pickedCount">0点</span></h3>
+      <p class="note">価格帯とサイズが散るように選ぶと、比較記事として読みやすくなります。</p>
+      <div id="pickedList" class="list"></div>
+    </div>
+    <div class="card">
+      <h3>口コミを読み込む</h3>
+      <p class="note">ボタンを押したときだけ取得します。取得したものは保存され、二度目は取りにいきません。
+        記事には本文をそのまま載せず、傾向の要約として書きます。</p>
+      <div id="reviewList" class="list"></div>
+    </div>
+  </div>
+
+  <!-- ステップ2 -->
+  <div class="stepbox" data-box="2" hidden>
+    <div class="card">
+      <h3>執筆用の材料をそろえる</h3>
+      <p class="note">スタイルガイド・商品情報・口コミの傾向をまとめたファイルを書き出します。</p>
+      <div class="row"><button class="primary" id="btnBrief">材料を書き出す</button>
+        <button class="ghost" id="btnCopyBrief">コピー</button>
+        <span class="note" id="briefPath"></span></div>
+      <textarea id="briefPreview" rows="8" readonly placeholder="書き出すとここに内容が表示されます"></textarea>
+    </div>
+
+    <div class="card">
+      <h3>Claude に書いてもらう</h3>
+      <p class="note">実体験の部分は書かせません。【　】が置かれるので、あとでご自身で埋めてください。</p>
+      <label>直したいところ（書き直しのときだけ）<textarea id="aiInstruction" rows="3"
+        placeholder="例：「選び方」の3つめを、もう少し具体的にしてください"></textarea></label>
+      <div class="row">
+        <button class="primary" id="btnAiWrite">最初から書いてもらう</button>
+        <button id="btnAiRevise">指示どおりに直してもらう</button>
+        <button class="ghost danger" id="btnAiCancel" style="display:none">中止</button>
+        <span class="note" id="aiStatus"></span>
+      </div>
+      <div id="aiResultBox" style="display:none;margin-top:12px">
+        <h3>結果 <span class="tag" id="aiDiffNote"></span></h3>
+        <textarea id="aiResult" rows="12"></textarea>
+        <div class="row"><button class="primary" id="btnAiApply">本文に反映する</button>
+          <button class="ghost" id="btnAiDiscard">使わない</button></div>
+      </div>
+    </div>
+
+    <div class="card" id="phBox" style="display:none">
+      <h3>あなたが書く場所 <span class="tag pink" id="phCount"></span></h3>
+      <p class="note">ここはAIに書かせません。期間・回数・具体的な出来事を入れると、読者にとって新しい情報になります。</p>
+      <div id="phList"></div>
+    </div>
+
+    <div class="card">
+      <h3>本文</h3>
+      <div class="row"><button class="primary" id="btnSaveArticle">保存</button>
+        <button class="ghost" id="btnOpenPreview">プレビューを開く</button>
+        <span class="note" id="articleSaved"></span>
+        <span class="spacer"></span><span class="note" id="articleChars"></span></div>
+      <textarea id="articleText" rows="26" placeholder="ここに本文（Markdown）が入ります"></textarea>
+    </div>
+  </div>
+
+  <!-- ステップ3 -->
+  <div class="stepbox" data-box="3" hidden>
+    <div class="card">
+      <h3>公開前チェック</h3>
+      <p class="note">スタイルガイドの決まりごと、誇大表現、実体験の付け方（ステマ規制）を自動で確認します。</p>
+      <div class="row"><button class="primary" id="btnCheck">チェックする</button>
+        <button class="ghost" id="btnFixAll" style="display:none"></button></div>
+      <div id="checkSolved"></div>
+      <div class="chkstatus" id="checkStatus"></div>
+      <div id="checkResults"></div>
+    </div>
+  </div>
+
+  <!-- ステップ4 -->
+  <div class="stepbox" data-box="4" hidden>
+    <div class="card">
+      <h3>記事の情報</h3>
+      <label>タイトル<input id="pubTitle"></label>
+      <div class="grid2">
+        <label>URL（英小文字・数字・ハイフン）<input id="pubSlug" placeholder="rabbit-cage"></label>
+        <label>カテゴリ<select id="pubCategory"></select></label>
+      </div>
+      <p class="note" id="pubUrlPreview"></p>
+      <label>タグ（カンマ区切り）<input id="pubTags" placeholder="ケージ選び, 初心者"></label>
+      <label>説明文（検索結果と一覧に出ます・80〜120字）<textarea id="pubDesc" rows="3"></textarea></label>
+      <label>公開日<input id="pubDate" type="date"></label>
+      <div class="row"><button class="primary" id="btnSaveMeta">保存</button>
+        <span class="note" id="metaSaved"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>アイキャッチ</h3>
+      <p class="note">一覧とSNSで使われる画像です。1200×630で書き出します。</p>
+      <div class="row">
+        <label style="margin:0"><input type="radio" name="eyeMode" value="generate" checked> 文字で作る</label>
+        <label style="margin:0"><input type="radio" name="eyeMode" value="upload"> 画像を選ぶ</label>
+      </div>
+      <div id="eyeGenerateBox">
+        <div class="inline" style="margin-top:10px">
+          <label>見出し<input id="eyeTitle"></label>
+          <label style="max-width:190px">配色<select id="eyeTheme">
+            <option value="food">えさ・牧草</option><option value="house">ケージ・サークル</option>
+            <option value="toy">おもちゃ・用品</option><option value="care">お手入れ・健康</option>
+            <option value="life">しつけ・暮らし</option></select></label>
+          <button class="ghost" id="btnMakeEye">作り直す</button>
+        </div>
+      </div>
+      <div id="eyeUploadBox" style="display:none;margin-top:10px">
+        <input type="file" id="eyeFile" accept="image/*">
+        <p class="note" id="eyeFileInfo"></p>
+        <button class="ghost" id="btnClearEye" style="display:none">取り消す</button>
+      </div>
+      <canvas id="eyeCanvas" width="1200" height="630"
+        style="width:100%;max-width:520px;margin-top:12px;border:1px solid var(--line);border-radius:9px"></canvas>
+      <div class="row"><button class="primary" id="btnSaveEye">この画像を使う</button>
+        <button class="ghost" id="btnDownloadEye">ダウンロード</button>
+        <span class="note" id="eyeSaved"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>公開する</h3>
+      <p class="note">「公開」にしてサイトに反映すると、この記事が toco-to.com に出ます。</p>
+      <div class="row">
+        <label style="margin:0"><input type="radio" name="pubStatus" value="draft" checked> 下書き（サイトに出さない）</label>
+        <label style="margin:0"><input type="radio" name="pubStatus" value="publish"> 公開</label>
+      </div>
+      <div id="pubReady" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary big" id="btnPublishNow">サイトに反映する</button>
+        <button class="ghost" id="btnBuildOnly">下書きのまま確認だけ</button>
+      </div>
+      <pre class="logbox" id="pubLog" style="display:none"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 持ちもの台帳 ============ -->
+<section id="view-inventory" class="view">
+  <div class="vh"><h1>持ちもの台帳</h1><span class="sub">ここに登録した商品にだけ、実体験を書けます</span>
+    <span class="spacer"></span><button class="primary" id="btnInvNew">用品を追加</button></div>
+  <div id="invList"></div>
+</section>
+
+<!-- ============ 公開 ============ -->
+<section id="view-publish" class="view">
+  <div class="vh"><h1>公開</h1><span class="sub">サイト全体をまとめて反映します</span></div>
+  <div id="pubDeploy"></div>
+  <div class="stats" id="pubStats"></div>
+
+  <div class="card">
+    <h3>サイトに反映する</h3>
+    <div class="stepline">
+      <div><span class="no">1</span><span>サイトを書き出す（HTMLを作る）</span></div>
+      <div><span class="no">2</span><span>変更を記録する（間違えても戻せます）</span></div>
+      <div><span class="no">3</span><span>GitHubに送る</span></div>
+      <div><span class="no">4</span><span>Cloudflare が自動で公開する（1〜2分）</span></div>
+    </div>
+    <label>変更の内容（あとから見て分かるように）<input id="pubMessage" placeholder="例：ケージの記事を公開"></label>
+    <div class="row">
+      <button class="primary big" id="btnSitePublish">サイトに反映する</button>
+      <button id="btnSiteBuild">書き出しだけ</button>
+      <button class="ghost" id="btnSitePreview">プレビューを見る</button>
+    </div>
+    <pre class="logbox" id="siteLog" style="display:none"></pre>
+  </div>
+
+  <div class="card">
+    <h3>記事の公開状態</h3>
+    <p class="note">ここでまとめて切り替えられます。切り替えたあと「サイトに反映する」を押すと公開されます。</p>
+    <table class="tbl"><thead><tr><th>タイトル</th><th>URL</th><th>カテゴリ</th><th>更新</th><th class="r">状態</th></tr></thead>
+      <tbody id="pubArticleRows"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>公開の履歴</h3>
+    <div id="pubHistory"><p class="note">まだありません。</p></div>
+  </div>
+
+  <div class="card" id="setupCard">
+    <h3>公開の準備</h3>
+    <div id="setupBody"></div>
+  </div>
+</section>
+
+<!-- ============ 設定 ============ -->
+<section id="view-settings" class="view">
+  <div class="vh"><h1>設定</h1></div>
+
+  <div class="card">
+    <h3>楽天ウェブサービス</h3>
+    <p class="note">商品の検索・スペック・画像に使います。無料で取得できます。</p>
+    <div class="grid2">
+      <label>アプリID<input id="setRakutenId"></label>
+      <label>アクセスキー<input id="setRakutenKey" type="password"></label>
+    </div>
+    <div class="row"><button class="primary" id="btnSaveSettings">保存</button>
+      <button class="ghost" id="btnTestRakuten">接続を試す</button>
+      <span class="note" id="settingsSaved"></span></div>
+    <p class="note">鍵は <code>toco-app/data/secrets.json</code> にだけ保存され、GitHubには送られません。</p>
+  </div>
+
+  <div class="card">
+    <h3>Claude Code</h3>
+    <p class="note">記事の下書きを書いてもらうのに使います。サブスクリプションで動くため、APIの従量課金は発生しません。</p>
+    <label>モデル<select id="setModel">
+      <option value="claude-opus-5">Claude Opus 5（推奨）</option>
+      <option value="claude-sonnet-5">Claude Sonnet 5（速い・安い）</option>
+    </select></label>
+    <div class="row"><button class="ghost" id="btnPingAi">動くか試す</button>
+      <span class="note" id="aiPingNote"></span></div>
+  </div>
+
+  <div class="card">
+    <h3>接続元のIPアドレス</h3>
+    <p class="note">APIの登録でIPの申告が必要なときに使います。</p>
+    <div class="row"><button class="ghost" id="btnMyIp">調べる</button><span class="note" id="myIpNote"></span></div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div id="toast"></div>
+<div id="modal"><div id="modalBody"></div></div>
+<script src="/app.js"></script>
+</body>
+</html>

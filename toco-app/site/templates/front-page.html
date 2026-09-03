@@ -1,0 +1,36 @@
+<main>
+    <section class="hero page-width" id="top">
+        <div class="hero-photo"><img src="/assets/images/hero-rabbit-photo.jpg" alt="かごやおもちゃのそばでくつろぐ茶色いうさぎ" width="1448" height="1086"></div>
+        <div class="hero-message">
+            <p class="hero-title">うさぎとの毎日を<br><strong>もっと</strong> 心地よく。</p>
+            <p class="hero-description">うさぎのごはんやおうち、おもちゃなど<br>暮らしに役立つ情報やアイテムを<br>やさしい視点でご紹介します。</p>
+            <a class="pink-button" href="#beginner">はじめての方へ <span>›</span></a>
+            <img class="hero-rabbit" src="/assets/images/rabbit-botanical.png" alt="草花と一緒に座るうさぎのイラスト" width="180" height="180">
+        </div>
+    </section>
+    <div class="slider-dots" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
+
+    <section class="category-section page-width" id="categories">
+        <div class="decor-heading"><span class="category-heading-art category-flower" aria-hidden="true"></span><h2>カテゴリから探す</h2><span class="category-heading-art category-sprig" aria-hidden="true"></span></div>
+        <div class="category-grid">{{CATEGORYCARDS}}</div>
+    </section>
+
+    <section class="pickup-section" id="pickup"><div class="page-width">
+        <div class="center-heading"><span class="heading-flora flora-left" aria-hidden="true"></span><h2>ピックアップ記事</h2><span class="heading-flora pickup-flora-right" aria-hidden="true"></span></div>
+        <div class="pickup-grid">{{PICKUP}}</div>
+    </div></section>
+
+    <section class="lower-section page-width" id="column">
+        <div class="column-box">
+            <div class="box-heading"><img class="pencil-original" src="/assets/images/pencil-original.png" alt="" width="29" height="29"><h2>コラム</h2><span class="heading-flora flora-right" aria-hidden="true"></span></div>
+            <div class="column-list">{{COLUMNS}}</div>
+            <a class="wide-pink-button" href="/category/column/">コラム一覧へ</a>
+        </div>
+
+        <aside class="sidebar">
+            <section class="tag-box"><h2>人気のタグ</h2><div class="tags">{{TAGS}}</div></section>
+            <section class="beginner-box" id="beginner"><div><p><span class="mini-flora" aria-hidden="true"></span>はじめての方へ</p><small>うさぎとの暮らしがもっと楽しくなる<br>基本情報や準備のポイントを<br>わかりやすくまとめています。</small><a href="/beginner/">詳しく見る</a></div><img src="/assets/images/rabbit-botanical.png" alt="草花と一緒に座るうさぎのイラスト" width="135" height="135"></section>
+            {{NEWSLETTER}}
+        </aside>
+    </section>
+</main>

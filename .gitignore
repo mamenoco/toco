@@ -1,0 +1,8 @@
+# APIの鍵が入っているので、絶対に公開しないこと
+toco-app/data/
+
+# 作業用
+toco-app/dist/.DS_Store
+.DS_Store
+node_modules/
+articles/work/

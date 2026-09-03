@@ -1,0 +1,358 @@
+/* ============================================================
+   記事本文（.entry-content）の追加スタイル
+   toco-kurashi テーマの assets/css/theme.css の末尾に貼り足してください。
+   既存のスタイル（h2 / h3 / img / a）はそのままで、
+   指定が無かった要素を補うだけの内容です。
+   ============================================================ */
+
+/* --- 段落 --- */
+.entry-content p { margin: 0 0 1.6em; }
+.entry-content > *:first-child { margin-top: 0; }
+.entry-content strong { font-weight: 700; color: var(--ink); }
+
+/* --- 見出し h4（型番＋メリットの見出しに使う） --- */
+.entry-content h4 {
+  margin: 30px 0 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--pink);
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* --- 商品のキャッチ1文（h4 の直後に置く強調文） --- */
+.entry-content .catch {
+  margin: 6px 0 14px;
+  color: var(--pink-dark);
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* --- 箇条書き --- */
+.entry-content ul,
+.entry-content ol { margin: 0 0 1.6em; padding-left: 0; }
+.entry-content ul { list-style: none; }
+.entry-content ul li {
+  position: relative;
+  margin-bottom: .5em;
+  padding-left: 1.5em;
+}
+.entry-content ul li::before {
+  content: "";
+  position: absolute;
+  top: .72em; left: .35em;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--pink);
+}
+.entry-content ol { counter-reset: toco; }
+.entry-content ol li {
+  position: relative;
+  margin-bottom: .5em;
+  padding-left: 1.9em;
+  list-style: none;
+  counter-increment: toco;
+}
+.entry-content ol li::before {
+  content: counter(toco);
+  position: absolute;
+  top: .3em; left: 0;
+  width: 1.4em; height: 1.4em;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: #fff; background: var(--pink);
+  font-size: .75em; font-weight: 700;
+}
+.entry-content li > ul,
+.entry-content li > ol { margin: .5em 0 0; }
+
+/* --- スペック表 --- */
+/* スマホでは横スクロールさせる。表が画面をはみ出して崩れるのを防ぎます */
+.entry-content table {
+  width: 100%;
+  margin: 0 0 1.8em;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.entry-content table th,
+.entry-content table td {
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.entry-content table tr:last-child th,
+.entry-content table tr:last-child td { border-bottom: 0; }
+/* 1列目を項目名として扱う */
+.entry-content table td:first-child,
+.entry-content table th:first-child {
+  width: 34%;
+  color: var(--ink);
+  background: var(--cream);
+  font-weight: 600;
+  border-right: 1px solid var(--line);
+}
+.entry-content table thead th {
+  background: var(--pink-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* --- 引用（口コミの注記・体験の枠） --- */
+.entry-content blockquote {
+  margin: 0 0 1.8em;
+  padding: 16px 20px;
+  border: 0;
+  border-left: 4px solid var(--gold);
+  border-radius: 0 12px 12px 0;
+  background: var(--beige);
+  color: var(--text);
+  font-size: 14px;
+}
+.entry-content blockquote p:last-child { margin-bottom: 0; }
+
+/* --- 区切り線 --- */
+.entry-content hr {
+  height: 1px;
+  margin: 40px 0;
+  border: 0;
+  background: var(--line);
+}
+
+/* --- 記事内リンク（関連記事への誘導） --- */
+.entry-content .related-link {
+  display: block;
+  margin: 0 0 1.8em;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  text-decoration: none;
+  transition: box-shadow .2s ease;
+}
+.entry-content .related-link:hover { box-shadow: var(--shadow); }
+.entry-content .related-link small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--pink-dark);
+  font-size: 11px;
+}
+.entry-content .related-link span {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+/* --- ページ内リンク（「今すぐ見る」） --- */
+.entry-content .jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 1.8em;
+  padding: 11px 22px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(90deg, #f2aeb6, #eda0a9);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* --- アフィリエイト表記 --- */
+.entry-content .affiliate-note {
+  margin: 0 0 1.8em;
+  color: #a39690;
+  font-size: 11px;
+}
+
+/* --- スマホ --- */
+@media (max-width: 600px) {
+  .entry-content h4 { font-size: 15px; }
+  .entry-content .catch { font-size: 15px; }
+  .entry-content table { font-size: 13px; }
+  .entry-content table th,
+  .entry-content table td { padding: 9px 11px; }
+  .entry-content table td:first-child,
+  .entry-content table th:first-child { width: 38%; }
+  .entry-content blockquote { padding: 13px 15px; font-size: 13px; }
+}
+
+/* --- 比較表（3列以上）の横スクロール --- */
+/* ============================================================
+   ここから下は「記事構成の変更」で追加したぶんです。
+   すでに上を反映済みの場合は、この部分だけを貼り足してください。
+   ============================================================ */
+.entry-content .table-scroll {
+  margin: 0 0 1.8em;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.entry-content .table-scroll table { margin: 0; min-width: 560px; }
+.entry-content table thead th {
+  background: var(--pink-soft);
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* 比較表では1列目だけ固定幅にせず、内容に合わせる */
+.entry-content .table-scroll table td:first-child,
+.entry-content .table-scroll table th:first-child { width: auto; }
+
+@media (max-width: 600px) {
+  .entry-content .table-scroll { margin-inline: -20px; padding-inline: 20px; }
+  .entry-content .table-scroll table { font-size: 12px; }
+  .entry-content .table-scroll table th,
+  .entry-content .table-scroll table td { padding: 8px 10px; }
+}
+
+/* ============================================================
+   目次（Table of Contents Plus）とタイトルの調整
+   ここから下は「目次のデザイン・タイトルの大きさ」で追加したぶんです。
+   ============================================================ */
+
+/* --- 目次（Table of Contents Plus） --- */
+/* プラグイン側が div#toc_container という強い指定をしてくるので、
+   こちらも同じ強さにそろえ、上書きされる項目には !important を付けています。 */
+div#toc_container,
+.entry-content div#toc_container {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 2em !important;
+  padding: 20px 24px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  background: var(--cream) !important;
+  box-shadow: 0 5px 18px rgba(90, 68, 59, .04);
+  font-size: 14px !important;
+  line-height: 1.9;
+}
+div#toc_container p.toc_title {
+  margin: 0 0 12px !important;
+  padding: 0 0 10px !important;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left !important;
+}
+div#toc_container p.toc_title::before {
+  content: "";
+  display: inline-block;
+  width: 22px; height: 22px;
+  margin-right: 7px;
+  vertical-align: -5px;
+  background: url('../images/flower-sprig.png') center/contain no-repeat;
+}
+div#toc_container .toc_toggle {
+  float: right;
+  font-family: "Noto Sans JP", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+}
+div#toc_container .toc_toggle a { color: var(--pink-dark); text-decoration: none; }
+
+div#toc_container ul.toc_list {
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+div#toc_container ul li {
+  margin: 0 0 6px !important;
+  padding-left: 0 !important;
+  list-style: none !important;
+}
+div#toc_container li::before { content: none !important; }
+div#toc_container ul.toc_list a {
+  color: var(--ink);
+  text-decoration: none;
+  transition: color .15s ease;
+}
+div#toc_container ul.toc_list a:hover { color: var(--pink-dark); }
+div#toc_container .toc_number {
+  display: inline-block;
+  min-width: 1.7em;
+  color: var(--pink-dark);
+  font-weight: 700;
+}
+/* 入れ子（h3 以下） */
+div#toc_container ul.toc_list ul {
+  margin: 5px 0 8px !important;
+  padding-left: 1.3em !important;
+}
+div#toc_container ul.toc_list ul li { margin-bottom: 3px !important; font-size: 13px; }
+div#toc_container ul.toc_list ul a { color: var(--text); }
+div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400; }
+
+@media (max-width: 600px) {
+  div#toc_container { padding: 16px !important; font-size: 13px !important; border-radius: 12px !important; }
+  div#toc_container p.toc_title { font-size: 15px; }
+  div#toc_container ul.toc_list ul li { font-size: 12px; }
+}
+
+/* --- 記事タイトルを小さくする（PC） --- */
+.single-header h1 {
+  font-size: clamp(24px, 2.6vw, 31px);
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .single-header h1 { font-size: 22px; }
+}
+
+/* --- 選び方の一覧リンク --- */
+/* 「選び方」の見出しの下に置く、各ポイントへ飛ぶリンクの一覧 */
+.entry-content .point-links { margin: 0 0 1.8em; }
+.entry-content .point-links li { padding-left: 0; }
+.entry-content .point-links li::before { content: none; }
+.entry-content .point-links a {
+  display: block;
+  padding: 11px 40px 11px 16px;
+  margin-bottom: 8px;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: box-shadow .2s ease;
+}
+.entry-content .point-links a:hover { box-shadow: var(--shadow); }
+.entry-content .point-links a::after {
+  content: "›";
+  position: absolute;
+  top: 50%; right: 16px;
+  transform: translateY(-50%);
+  color: var(--pink-dark);
+  font-size: 17px;
+}
+@media (max-width: 600px) {
+  .entry-content .point-links a { padding: 10px 34px 10px 13px; font-size: 13px; }
+}
+
+/* --- 各セクションの結論の1文（選び方など） --- */
+.entry-content .lead {
+  margin: 0 0 1.2em;
+  padding: 12px 16px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 10px 10px 0;
+  background: #fffdf7;
+  color: var(--ink);
+  font-family: "Zen Maru Gothic", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+@media (max-width: 600px) {
+  .entry-content .lead { padding: 10px 13px; font-size: 14px; }
+}
