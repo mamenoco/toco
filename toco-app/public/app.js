@@ -113,7 +113,9 @@ function renderHome() {
     stat('公開中の記事', s.articles.published, '本'),
     stat('下書き', s.articles.draft, '本'),
     stat('未反映の変更', s.deploy.isRepo ? s.deploy.changedCount : '—', s.deploy.isRepo ? '件' : ''),
-    stat('最後に公開', s.lastPublish ? timeAgo(s.lastPublish) : (s.deploy.lastCommit ? s.deploy.lastCommit.date.slice(5) : 'まだ'), ''),
+    s.lastPublish
+      ? stat('最後に公開', timeAgo(s.lastPublish), '')
+      : stat('最後の記録', s.deploy.lastCommit ? s.deploy.lastCommit.date.slice(5) : 'まだ', ''),
   ].join('');
 
   const working = STATE.projects.filter((p) => !p.published);
