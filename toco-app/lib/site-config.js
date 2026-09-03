@@ -49,5 +49,9 @@ module.exports = {
   // Yahoo!ボタンを出すか（フェーズ1では出さない判断・設計書§3-7）
   showYahoo: false,
 
+  // お問い合わせフォーム（Googleフォームの「埋め込む」で出てくるURL）
+  // 空のあいだは、ページに「準備中」の案内が出ます。
+  contactFormUrl: '',
+
   archivePerPage: 12,
 };

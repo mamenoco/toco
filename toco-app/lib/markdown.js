@@ -215,6 +215,7 @@ function render(md, opts) {
     }
 
     // 通常の段落
+    const start = i;
     const buf = [];
     while (i < lines.length && lines[i].trim()
       && !/^([#>|]|[-*]\s|\d+\.\s|<[a-zA-Z!/]|\{\{)/.test(lines[i].trim())
@@ -223,6 +224,10 @@ function render(md, opts) {
       i++;
     }
     flushPara(buf);
+
+    // どの分岐にも当てはまらず、行が1つも進まなかった場合の保険。
+    // ここを抜かすと無限ループになります（{{product:…}} 以外の {{…}} など）。
+    if (i === start) { push(inline(line)); i++; }
   }
 
   return { html: out.join('\n'), headings, toc: buildToc(headings) };

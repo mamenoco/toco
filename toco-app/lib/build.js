@@ -239,6 +239,7 @@ function buildAssets() {
       // 追従ヘッダーの下に見出しが隠れないようにする（比較表からのジャンプ用）
       '.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:140px}',
       '@media(max-width:900px){.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:80px}}',
+      '.contact-form{margin:24px 0}.contact-form iframe{width:100%;border:0;border-radius:12px;background:#fff}',
       // 商品カード
       [
         '.pd-box{display:flex;gap:18px;margin:26px 0;padding:20px;border:1px solid var(--line);',
@@ -370,9 +371,27 @@ function buildSingle(a, prev, next, ctx) {
   }));
 }
 
+// お問い合わせフォームの埋め込み。
+// 静的サイトではPHPが動かないため、Googleフォームをiframeで読み込みます。
+function contactForm() {
+  if (!config.contactFormUrl) {
+    return '<p class="lead">お問い合わせフォームは準備中です。'
+      + 'しばらくお待ちください。</p>';
+  }
+  return '<div class="contact-form"><iframe src="' + esc(config.contactFormUrl) + '"'
+    + ' width="100%" height="900" frameborder="0" marginheight="0" marginwidth="0"'
+    + ' loading="lazy" title="お問い合わせフォーム">読み込んでいます…</iframe></div>';
+}
+
 function buildPage(p, ctx) {
   const r = markdown.render(p.body, { product: (id) => productCard(id, ctx) });
-  const content = fill(readTpl('page.html'), { TITLE: esc(p.title), TOC: r.toc, BODY: r.html });
+  let body = r.html.replace(/\{\{contact-form\}\}/g, () => contactForm());
+  // 目次は記事と同じく、最初の見出しの直前に置きます
+  if (r.toc) {
+    const at = body.indexOf('<h2');
+    body = at === -1 ? r.toc + '\n' + body : body.slice(0, at) + r.toc + '\n' + body.slice(at);
+  }
+  const content = fill(readTpl('page.html'), { TITLE: esc(p.title), TOC: '', BODY: body });
   write(`${p.slug}/index.html`, layout({
     path: `/${p.slug}/`, title: p.title, description: p.description,
     bodyClass: 'page', content, ...ctx,
@@ -439,7 +458,7 @@ function buildFrontPage(published, ctx) {
   write('index.html', layout({ path: '/', bodyClass: 'home', content, ...ctx }));
 }
 
-function buildExtras(published, ctx) {
+function buildExtras(published, ctx, extra) {
   // 404
   const notFound = `<main class="archive-main page-width">
   <header class="archive-header"><h1>ページが見つかりませんでした</h1></header>
@@ -450,6 +469,7 @@ function buildExtras(published, ctx) {
 
   // sitemap.xml
   const urls = ['/'].concat(published.map((a) => `/${a.slug}/`))
+    .concat((extra && extra.pages || []).map((p) => `/${p.slug}/`))
     .concat(config.categories.map((c) => `/category/${c.slug}/`));
   write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -504,7 +524,7 @@ function build(opts) {
   pages.forEach((p) => buildPage(p, ctx));
 
   buildFrontPage(published, ctx);
-  buildExtras(published, ctx);
+  buildExtras(published, ctx, { pages });
 
   return {
     ms: Date.now() - started,
