@@ -51,7 +51,7 @@ module.exports = {
 
   // お問い合わせフォーム（Googleフォームの「埋め込む」で出てくるURL）
   // 空のあいだは、ページに「準備中」の案内が出ます。
-  contactFormUrl: '',
+  contactFormUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSdvQeXbTaEzkmCt6d3cql9dTwZIQu4p9zm4WZCTpfxmF8Mq0w/viewform?embedded=true',
 
   archivePerPage: 12,
 };

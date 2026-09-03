@@ -1027,13 +1027,41 @@ async function renderProducts() {
       <td style="width:56px">${p.image ? '<img src="' + esc(p.image) + '" style="width:44px;height:44px;object-fit:contain;border-radius:6px;background:#faf6f2">' : ''}</td>
       <td class="t">${esc(p.name)}<div class="note" style="margin:2px 0 0">${esc(p.brand || '—')}</div></td>
       <td><code style="font-size:11px">{{product:${esc(p.id)}}}</code></td>
-      <td>${p.amazon && p.amazon.asin ? '<span class="tag ok">ASIN登録済み</span>' : '<span class="tag warn">検索リンク</span>'}</td>
+      <td>${p.amazon && p.amazon.asin
+        ? '<span class="tag ok">' + esc(p.amazon.asin) + '</span>'
+        : '<a class="tag warn" href="https://www.amazon.co.jp/s?k=' + encodeURIComponent(p.name)
+          + '" target="_blank" rel="noopener">Amazonで探す ↗</a>'}</td>
       <td>${p.owned ? '<span class="tag pink">台帳にあり</span>' : '—'}</td>
       <td class="r"><button class="ghost" data-copy="${i}">記法をコピー</button>
         <button class="ghost" data-edit="${i}">編集</button>
         <button class="ghost danger" data-del="${i}">削除</button></td>
     </tr>`).join('') + '</tbody></table></div>'
     : '<div class="empty">まだ商品がありません。記事の「商品を選ぶ」で選んだあと、そこから登録できます。</div>';
+
+  const missing = PRODUCTS.filter((p) => !(p.amazon && p.amazon.asin));
+  if (missing.length) {
+    $('#prodList').insertAdjacentHTML('beforeend', `<div class="card">
+      <h3>ASINをまとめて登録 <span class="tag warn">${missing.length}件 未登録</span></h3>
+      <p class="note">「Amazonで探す」で商品ページを開き、そのURLをそのまま貼ってください。
+        ASINは自動で取り出します。貼り終えたら「保存」を押します。</p>
+      ${missing.map((p, i) => `<label>${esc(p.name)}
+        <input id="asin${i}" placeholder="https://www.amazon.co.jp/dp/XXXXXXXXXX"></label>`).join('')}
+      <div class="row"><button class="primary" id="btnAsinSave">保存</button>
+        <span class="note">空欄のものはそのままです（Amazon検索ページ行きのまま）。</span></div>
+    </div>`);
+    $('#btnAsinSave').addEventListener('click', async () => {
+      let n = 0;
+      for (let i = 0; i < missing.length; i++) {
+        const v = $('#asin' + i).value.trim();
+        if (!v) continue;
+        await api('products/save', { product: { id: missing[i].id, name: missing[i].name, amazonUrl: v } });
+        n++;
+      }
+      if (!n) return toast('URLが入力されていません');
+      await renderProducts();
+      toast(n + '件のASINを登録しました');
+    });
+  }
 
   $('#prodList').querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => {
     const p = PRODUCTS[Number(b.dataset.copy)];
