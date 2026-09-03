@@ -395,6 +395,10 @@ function buildExtras(published, ctx) {
   // robots.txt
   write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${config.url}/sitemap.xml\n`);
 
+  // Cloudflare Pages が配る *.pages.dev のURLを検索結果に出さない。
+  // 本番（toco-to.com）と中身が同じなので、両方が拾われると重複扱いになるため。
+  write('_headers', 'https://*.pages.dev/*\n  X-Robots-Tag: noindex\n');
+
   // 検索用のインデックス
   write('search-index.json', JSON.stringify(published.map((a) => ({
     t: a.title, u: `/${a.slug}/`, c: a.category, d: a.description,
