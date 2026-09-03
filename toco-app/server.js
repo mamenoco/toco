@@ -29,6 +29,8 @@ const markdown = require('./lib/markdown.js');
 const builder = require('./lib/build.js');
 const deploy = require('./lib/deploy.js');
 const siteConfig = require('./lib/site-config.js');
+const affiliate = require('./lib/affiliate.js');
+const products = require('./lib/products.js');
 const preview = require('./lib/preview-server.js');
 
 const ROOT = __dirname;
@@ -58,6 +60,7 @@ function readBody(req) {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon',
 };
 
 // ---------- 記事とプロジェクトのつなぎ ----------
@@ -136,6 +139,16 @@ const server = http.createServer(async (req, res) => {
   const p = u.pathname;
 
   if (!p.startsWith('/api/')) {
+    // /assets/ は site/assets/（商品画像・アイキャッチ・ファビコン）から配ります。
+    // 画面で商品画像を表示するために必要です。
+    if (p.startsWith('/assets/')) {
+      const asset = path.join(ROOT, 'site', path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
+      if (asset.startsWith(path.join(ROOT, 'site')) && fs.existsSync(asset) && fs.statSync(asset).isFile()) {
+        return send(res, 200, fs.readFileSync(asset),
+          MIME[path.extname(asset)] || 'application/octet-stream');
+      }
+      return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+    }
     const file = p === '/' ? '/index.html' : p;
     const full = path.join(ROOT, 'public', path.normalize(file).replace(/^(\.\.[/\\])+/, ''));
     if (fs.existsSync(full) && fs.statSync(full).isFile()) {
@@ -159,12 +172,72 @@ const server = http.createServer(async (req, res) => {
         projects: db.projects.map(projectSummary),
         site: siteState(),
         categories: siteConfig.categories,
+        productCount: products.load().length,
       });
     }
 
     // ===== 設定 =====
     if (p === '/api/settings/save') {
       return send(res, 200, { ok: true, settings: DB.saveSettings(body) });
+    }
+
+    // ===== もしもアフィリエイト =====
+    // 管理画面で発行したリンク（かんたんリンクのコード、またはクリックURL）を
+    // そのまま貼ってもらい、広告主ごとのIDを取り出して保存します。
+    if (p === '/api/settings/moshimo') {
+      const found = affiliate.parse(body.text || '');
+      const malls = Object.keys(found);
+      if (!malls.length) {
+        return send(res, 200, { error: 'リンクを読み取れませんでした。もしもの「かんたんリンク」のコードを、そのまま貼り付けてください。' });
+      }
+      const tpl = affiliate.toTemplates(found);
+      const merged = Object.assign({}, settings.moshimo || {}, tpl);
+      DB.saveSettings({ moshimo: merged });
+      return send(res, 200, { ok: true, malls, moshimo: merged });
+    }
+
+    // ===== 商品マスタ =====
+    if (p === '/api/products') {
+      return send(res, 200, {
+        products: products.markOwned(products.load(), db.inventory),
+        moshimo: settings.moshimo || {},
+      });
+    }
+
+    if (p === '/api/products/save') {
+      const src = body.product || {};
+      if (!src.name) return send(res, 200, { error: '商品名を入れてください' });
+      const id = src.id || products.suggestId(src.idHint || src.name);
+      // Amazonの商品ページURLを貼られたら、ASINを取り出します
+      if (src.amazonUrl) src.amazon = Object.assign({}, src.amazon, { asin: affiliate.asinFromUrl(src.amazonUrl) });
+      delete src.amazonUrl; delete src.idHint;
+      return send(res, 200, { ok: true, product: products.upsert(Object.assign({}, src, { id })) });
+    }
+
+    if (p === '/api/products/delete') {
+      products.remove(body.id);
+      return send(res, 200, { ok: true });
+    }
+
+    // 記事で選んだ商品を、まとめて商品マスタに登録します
+    if (p === '/api/products/from-picked') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr) return send(res, 200, { error: '記事が見つかりません' });
+      const made = (pr.products || []).map((item) => {
+        const existing = products.load().find((x) =>
+          (x.rakuten && item.code && x.rakuten.itemCode === item.code) || x.name === item.name);
+        return products.upsert(products.fromSearchItem(item, {
+          id: existing ? existing.id : undefined,
+          category: categorySlug(pr.category),
+          brand: existing ? existing.brand : '',
+        }));
+      });
+      return send(res, 200, { ok: true, products: made });
+    }
+
+    // 商品カードの下書き（記事に貼る記法）
+    if (p === '/api/products/snippet') {
+      return send(res, 200, { snippet: '{{product:' + String(body.id || '') + '}}' });
     }
 
     if (p === '/api/settings/test-rakuten') {

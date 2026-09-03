@@ -46,5 +46,8 @@ module.exports = {
   // 透過が不要な画像はJPEGにする（他は mix-blend-mode: multiply を使うのでPNGのまま）
   imageToJpeg: { "hero-rabbit-photo.png": "hero-rabbit-photo.jpg" },
 
+  // Yahoo!ボタンを出すか（フェーズ1では出さない判断・設計書§3-7）
+  showYahoo: false,
+
   archivePerPage: 12,
 };

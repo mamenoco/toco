@@ -11,6 +11,9 @@ const { execFileSync } = require('child_process');
 
 const markdown = require('./markdown.js');
 const config = require('./site-config.js');
+const affiliate = require('./affiliate.js');
+const products = require('./products.js');
+const DB = require('./db.js');
 
 const APP = path.join(__dirname, '..');
 const ROOT = path.join(APP, '..');
@@ -101,9 +104,38 @@ function loadMarkdownDir(dir, kind) {
 
 // ---------- 商品カード（フェーズ2で本実装） ----------
 
-function productPlaceholder(id) {
-  return '<div class="pd-box pd-placeholder" data-product="' + esc(id) + '">'
-    + '<p>商品カード（' + esc(id) + '）</p></div>';
+// 商品カードを組み立てる。
+// リンクは もしもアフィリエイト のクリックURLにします（§3-3）。
+// rel="nofollow sponsored" は広告リンクである印。付け忘れるとスパム判定の対象になります。
+function productCard(id, ctx) {
+  const p = ctx.products[id];
+  if (!p) return '<!-- 商品が見つかりません: ' + esc(id) + ' -->';
+
+  const t = affiliate.targets(p);
+  const button = (mall, label) => {
+    const href = affiliate.link(mall, t[mall], ctx.moshimo);
+    if (!href) return '';
+    return '<a class="pd-btn pd-' + mall + '" href="' + esc(href) + '"'
+      + ' target="_blank" rel="nofollow sponsored noopener" data-mall="' + mall + '">'
+      + esc(label) + '</a>';
+  };
+
+  const malls = [['amazon', 'Amazon'], ['rakuten', '楽天市場']];
+  if (config.showYahoo) malls.push(['yahoo', 'Yahoo!']);
+  const buttons = malls.map(([m, l]) => button(m, l)).filter(Boolean).join('');
+  if (!buttons) return '<!-- リンクを作れませんでした: ' + esc(id) + ' -->';
+
+  const img = p.image
+    ? '<div class="pd-img"><img src="' + esc(p.image) + '" alt="" loading="lazy"></div>' : '';
+
+  return '<div class="pd-box" data-product="' + esc(id) + '">'
+    + img
+    + '<div class="pd-body">'
+    + (p.brand ? '<p class="pd-brand">' + esc(p.brand) + '</p>' : '')
+    + '<p class="pd-name">' + esc(p.name) + '</p>'
+    + '<div class="pd-btns">' + buttons + '</div>'
+    + '<p class="pd-note">価格は変動します。最新の価格は各ストアでご確認ください。</p>'
+    + '</div></div>';
 }
 
 // 旧記事に残っている「Amazonで詳細を見る｜楽天市場で…」の行を目印として拾う
@@ -207,9 +239,30 @@ function buildAssets() {
       // 追従ヘッダーの下に見出しが隠れないようにする（比較表からのジャンプ用）
       '.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:140px}',
       '@media(max-width:900px){.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:80px}}',
-      // 商品カードの仮スタイル（フェーズ2で置き換え）
-      '.pd-placeholder{margin:24px 0;padding:22px;border:1px dashed #e0c9c4;border-radius:14px;'
-      + 'background:#fffaf6;color:#b09a94;font-size:12px;text-align:center}.pd-placeholder p{margin:0}',
+      // 商品カード
+      [
+        '.pd-box{display:flex;gap:18px;margin:26px 0;padding:20px;border:1px solid var(--line);',
+        'border-radius:14px;background:#fff;box-shadow:0 4px 16px rgba(90,68,59,.05)}',
+        '.pd-img{flex:0 0 132px}',
+        '.pd-img img{width:132px;height:132px;object-fit:contain;border-radius:8px;background:#fdfaf7}',
+        '.pd-body{min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center}',
+        '.pd-brand{margin:0 0 2px;color:#a3968f;font-size:11px;letter-spacing:.04em}',
+        '.pd-name{margin:0 0 14px;font-family:"Zen Maru Gothic",sans-serif;font-size:15px;',
+        'font-weight:700;line-height:1.6}',
+        '.pd-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}',
+        '.pd-btn{display:grid;place-items:center;height:42px;border-radius:999px;color:#fff!important;',
+        'font-size:13px;font-weight:700;text-decoration:none!important;letter-spacing:.02em;',
+        'box-shadow:0 4px 10px rgba(120,90,70,.13);transition:transform .15s ease,filter .15s ease}',
+        '.pd-btn:hover{transform:translateY(-1px);filter:brightness(1.05)}',
+        '.pd-amazon{background:#f79256}',
+        '.pd-rakuten{background:#f76956}',
+        '.pd-yahoo{background:#7b9fd4}',
+        '.pd-note{margin:11px 0 0;color:#a3968f;font-size:10px;line-height:1.6}',
+        '@media(max-width:600px){',
+        '.pd-box{flex-direction:column;gap:14px;padding:16px;align-items:center;text-align:center}',
+        '.pd-img{flex:none}.pd-body{width:100%}.pd-name{font-size:14px}',
+        '.pd-btns{grid-template-columns:1fr 1fr}}',
+      ].join(''),
     ].join('\n'),
   ].join('\n\n');
   write('assets/css/site.css', css);
@@ -260,6 +313,17 @@ function buildAssets() {
     });
   }
 
+  // 商品画像（楽天APIから取得したもの）
+  const prodSrc = path.join(APP, 'site/assets/products');
+  if (fs.existsSync(prodSrc)) {
+    const prodOut = path.join(DIST, 'assets/products');
+    mkdir(prodOut);
+    fs.readdirSync(prodSrc).filter((f) => /\.(png|jpg)$/i.test(f)).forEach((f) => {
+      fs.copyFileSync(path.join(prodSrc, f), path.join(prodOut, f));
+      after += fs.statSync(path.join(prodOut, f)).size;
+    });
+  }
+
   // ファビコン
   const favSrc = path.join(APP, 'site/assets/favicon');
   const favOut = path.join(DIST, 'assets/favicon');
@@ -277,7 +341,7 @@ function buildAssets() {
 function buildSingle(a, prev, next, ctx) {
   const cat = categoryOf(a.category);
   const md = replaceLegacyProductLines(a.body);
-  const r = markdown.render(md, { product: productPlaceholder });
+  const r = markdown.render(md, { product: (id) => productCard(id, ctx) });
 
   const hero = a.eyecatch
     ? `<figure class="single-hero"><img src="${esc(a.eyecatch)}" alt=""></figure>` : '';
@@ -307,7 +371,7 @@ function buildSingle(a, prev, next, ctx) {
 }
 
 function buildPage(p, ctx) {
-  const r = markdown.render(p.body, { product: productPlaceholder });
+  const r = markdown.render(p.body, { product: (id) => productCard(id, ctx) });
   const content = fill(readTpl('page.html'), { TITLE: esc(p.title), TOC: r.toc, BODY: r.html });
   write(`${p.slug}/index.html`, layout({
     path: `/${p.slug}/`, title: p.title, description: p.description,
@@ -410,7 +474,16 @@ function buildExtras(published, ctx) {
 function build(opts) {
   const options = opts || {};
   const started = Date.now();
-  const ctx = { year: options.year || 2026, assetVer: options.assetVer || '1' };
+  const settings = DB.loadSettings();
+  const list = products.load();
+  const byId = {};
+  list.forEach((p) => { byId[p.id] = p; });
+  const ctx = {
+    year: options.year || 2026,
+    assetVer: options.assetVer || '1',
+    products: byId,
+    moshimo: settings.moshimo || {},
+  };
 
   fs.rmSync(DIST, { recursive: true, force: true });
   mkdir(DIST);

@@ -38,7 +38,8 @@ function flash(el, msg) {
 // ---------- 画面切り替え ----------
 const RENDER = {
   home: renderHome, ideas: renderIdeas, articles: renderArticles,
-  inventory: renderInventory, publish: renderPublish, settings: renderSettings,
+  products: renderProducts, inventory: renderInventory,
+  publish: renderPublish, settings: renderSettings,
 };
 
 function show(view, keepHash) {
@@ -79,6 +80,7 @@ async function refresh() {
   setTail('#navPublish', pend);
   setTail('#navIdeas', (STATE.ideas || []).filter((i) => i.status === '未着手').length);
   setTail('#navArticles', STATE.projects.filter((p) => !p.published).length);
+  setTail('#navProducts', 0);
   $('#sideState').textContent = `公開 ${s.articles.published}本 / 下書き ${s.articles.draft}本`;
 }
 
@@ -506,6 +508,31 @@ function renderReviewStep() {
     } catch (e) { b.disabled = false; b.textContent = '口コミを取得'; }
   }));
 }
+
+$('#btnToMaster').addEventListener('click', async () => {
+  if (!(CURRENT.products || []).length) return toast('先に商品を選んでください');
+  const r = await api('products/from-picked', { id: CURRENT.id });
+  $('#snippetBox').innerHTML = '<h3 style="margin-top:18px">本文に貼る記法</h3>'
+    + '<p class="note">商品カードを出したい場所に、この1行を貼ってください。'
+    + '見た目はビルドのときに作られます。</p>'
+    + '<div class="list">' + r.products.map((p) => `
+      <div class="item"><div class="body">
+        <div class="nm">${esc(p.name)}</div>
+        <div class="mt"><code>{{product:${esc(p.id)}}}</code></div>
+        <div class="acts"><button class="ghost" data-snip="${esc(p.id)}">コピー</button>
+          <button class="ghost" data-ins="${esc(p.id)}">本文の末尾に追加</button></div>
+      </div></div>`).join('') + '</div>';
+
+  $('#snippetBox').querySelectorAll('[data-snip]').forEach((b) => b.addEventListener('click', () => {
+    navigator.clipboard.writeText('{{product:' + b.dataset.snip + '}}').then(() => toast('コピーしました'));
+  }));
+  $('#snippetBox').querySelectorAll('[data-ins]').forEach((b) => b.addEventListener('click', async () => {
+    $('#articleText').value += '\n\n{{product:' + b.dataset.ins + '}}\n';
+    await saveProject({ article: $('#articleText').value });
+    updateChars(); toast('本文の末尾に追加しました');
+  }));
+  toast(r.products.length + '点を商品マスタに登録しました');
+});
 
 // ---- ステップ2：執筆 ----
 $('#btnBrief').addEventListener('click', async () => {
@@ -975,6 +1002,85 @@ $('#btnDownloadEye').addEventListener('click', () => {
 });
 
 // ================================================================
+// 商品マスタ
+// ================================================================
+let PRODUCTS = [], MOSHIMO = {};
+
+async function renderProducts() {
+  const r = await api('products');
+  PRODUCTS = r.products;
+  MOSHIMO = r.moshimo || {};
+  $('#prodCount').textContent = PRODUCTS.length + '点';
+
+  const malls = Object.keys(MOSHIMO);
+  $('#prodAlert').innerHTML = malls.length ? ''
+    : '<div class="card" style="border-color:#eccfc9;background:#fdf7f6">'
+    + '<b>もしもアフィリエイトのリンクが未登録です</b>'
+    + '<p class="note">このままだと商品カードにボタンが出ません。'
+    + '設定画面の「もしもアフィリエイト」に、かんたんリンクのコードを貼ってください。</p>'
+    + '<button class="primary" id="goSetMoshimo">設定を開く</button></div>';
+  if ($('#goSetMoshimo')) $('#goSetMoshimo').onclick = () => show('settings');
+
+  $('#prodList').innerHTML = PRODUCTS.length ? '<div class="card"><table class="tbl">'
+    + '<thead><tr><th></th><th>商品名</th><th>記事に貼る記法</th><th>Amazon</th><th>体験</th><th class="r"></th></tr></thead><tbody>'
+    + PRODUCTS.map((p, i) => `<tr>
+      <td style="width:56px">${p.image ? '<img src="' + esc(p.image) + '" style="width:44px;height:44px;object-fit:contain;border-radius:6px;background:#faf6f2">' : ''}</td>
+      <td class="t">${esc(p.name)}<div class="note" style="margin:2px 0 0">${esc(p.brand || '—')}</div></td>
+      <td><code style="font-size:11px">{{product:${esc(p.id)}}}</code></td>
+      <td>${p.amazon && p.amazon.asin ? '<span class="tag ok">ASIN登録済み</span>' : '<span class="tag warn">検索リンク</span>'}</td>
+      <td>${p.owned ? '<span class="tag pink">台帳にあり</span>' : '—'}</td>
+      <td class="r"><button class="ghost" data-copy="${i}">記法をコピー</button>
+        <button class="ghost" data-edit="${i}">編集</button>
+        <button class="ghost danger" data-del="${i}">削除</button></td>
+    </tr>`).join('') + '</tbody></table></div>'
+    : '<div class="empty">まだ商品がありません。記事の「商品を選ぶ」で選んだあと、そこから登録できます。</div>';
+
+  $('#prodList').querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => {
+    const p = PRODUCTS[Number(b.dataset.copy)];
+    navigator.clipboard.writeText('{{product:' + p.id + '}}').then(() => toast('コピーしました。本文の貼りたい場所に貼ってください'));
+  }));
+  $('#prodList').querySelectorAll('[data-edit]').forEach((b) =>
+    b.addEventListener('click', () => productForm(PRODUCTS[Number(b.dataset.edit)])));
+  $('#prodList').querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    const p = PRODUCTS[Number(b.dataset.del)];
+    if (!confirm(p.name + ' を商品マスタから削除します。記事に {{product:' + p.id + '}} が残っていると表示されなくなります。よろしいですか？')) return;
+    await api('products/delete', { id: p.id });
+    renderProducts();
+  }));
+}
+
+function productForm(item) {
+  const p = item || {};
+  modal(`<h3>${item ? '商品を編集' : '商品を追加'}</h3>
+    <label>商品名<input id="qName" value="${esc(p.name || '')}"></label>
+    <div class="grid2">
+      <label>ブランド（英字＋カタカナ）<input id="qBrand" value="${esc(p.brand || '')}" placeholder="SANKO(三晃商会)"></label>
+      <label>カテゴリ<select id="qCat">${STATE.categories.map((c) =>
+    `<option value="${c.slug}" ${c.slug === p.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+    </div>
+    <label>楽天の商品ページURL<input id="qRak" value="${esc((p.rakuten || {}).url || '')}"></label>
+    <label>Amazonの商品ページURL（貼るとASINを自動で取り出します）
+      <input id="qAmz" placeholder="https://www.amazon.co.jp/dp/XXXXXXXXXX" value="${esc((p.amazon || {}).asin ? 'https://www.amazon.co.jp/dp/' + p.amazon.asin : '')}"></label>
+    <p class="note">Amazonのリンクは、ASINが無いと検索ページ行きになります。入れておくと商品ページに直接飛べます。</p>
+    <label>画像のパス<input id="qImg" value="${esc(p.image || '')}" placeholder="/assets/products/xxx.jpg"></label>
+    <div class="row end"><button class="ghost" id="qCancel">やめる</button><button class="primary" id="qOk">保存</button></div>`);
+  $('#qCancel').onclick = closeModal;
+  $('#qOk').onclick = async () => {
+    const name = $('#qName').value.trim();
+    if (!name) return toast('商品名を入れてください');
+    await api('products/save', { product: {
+      id: p.id, name, brand: $('#qBrand').value.trim(), category: $('#qCat').value,
+      image: $('#qImg').value.trim(),
+      rakuten: Object.assign({}, p.rakuten, { url: $('#qRak').value.trim() }),
+      amazonUrl: $('#qAmz').value.trim(),
+      amazon: p.amazon || {},
+    } });
+    closeModal(); renderProducts(); toast('保存しました');
+  };
+}
+$('#btnProdNew').addEventListener('click', () => productForm(null));
+
+// ================================================================
 // 持ちもの台帳
 // ================================================================
 function renderInventory() {
@@ -1150,7 +1256,25 @@ function renderSettings() {
   $('#setRakutenId').value = s.rakutenAppId || '';
   $('#setRakutenKey').value = s.rakutenAccessKey || '';
   $('#setModel').value = s.aiModel || 'claude-opus-5';
+
+  const m = s.moshimo || {};
+  const rows = Object.keys(m);
+  $('#moshimoState').innerHTML = rows.length
+    ? '<table class="tbl"><thead><tr><th>広告主</th><th>リンクの型</th></tr></thead><tbody>'
+    + rows.map((k) => `<tr><td class="t">${k === 'amazon' ? 'Amazon' : k === 'rakuten' ? '楽天市場' : 'Yahoo!'}</td>
+       <td class="note" style="padding:10px;word-break:break-all">${esc(m[k].preview)}</td></tr>`).join('')
+    + '</tbody></table>'
+    : '<p class="note" style="color:var(--err)">まだ登録されていません。登録するまで商品カードにボタンが出ません。</p>';
 }
+
+$('#btnReadMoshimo').addEventListener('click', async () => {
+  const text = $('#setMoshimo').value.trim();
+  if (!text) return toast('コードを貼り付けてください');
+  const r = await api('settings/moshimo', { text });
+  $('#setMoshimo').value = '';
+  await refresh(); renderSettings();
+  toast(r.malls.map((x) => x === 'amazon' ? 'Amazon' : x === 'rakuten' ? '楽天' : 'Yahoo!').join('と') + ' を読み取りました');
+});
 
 $('#btnSaveSettings').addEventListener('click', async () => {
   await api('settings/save', {

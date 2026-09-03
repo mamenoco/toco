@@ -14,6 +14,7 @@
   <button class="nav on" data-view="home"><span class="ic">◉</span>ホーム</button>
   <button class="nav" data-view="ideas"><span class="ic">✎</span>記事ネタ<span class="tail" id="navIdeas" hidden></span></button>
   <button class="nav" data-view="articles"><span class="ic">▤</span>記事<span class="tail" id="navArticles" hidden></span></button>
+  <button class="nav" data-view="products"><span class="ic">▢</span>商品<span class="tail" id="navProducts" hidden></span></button>
   <button class="nav" data-view="inventory"><span class="ic">☖</span>持ちもの台帳</button>
   <div class="sep"></div>
   <button class="nav" data-view="publish"><span class="ic">↥</span>公開<span class="tail" id="navPublish" hidden></span></button>
@@ -105,6 +106,11 @@
       <h3>この記事に載せる商品 <span class="tag" id="pickedCount">0点</span></h3>
       <p class="note">価格帯とサイズが散るように選ぶと、比較記事として読みやすくなります。</p>
       <div id="pickedList" class="list"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="btnToMaster">商品マスタに登録する</button>
+        <span class="note" id="masterNote">登録すると、本文に貼るための記法（{{product:…}}）が発行されます。</span>
+      </div>
+      <div id="snippetBox"></div>
     </div>
     <div class="card">
       <h3>口コミを読み込む</h3>
@@ -236,6 +242,15 @@
   </div>
 </section>
 
+<!-- ============ 商品マスタ ============ -->
+<section id="view-products" class="view">
+  <div class="vh"><h1>商品</h1><span class="sub" id="prodCount"></span>
+    <span class="spacer"></span>
+    <button class="primary" id="btnProdNew">商品を追加</button></div>
+  <div id="prodAlert"></div>
+  <div id="prodList"></div>
+</section>
+
 <!-- ============ 持ちもの台帳 ============ -->
 <section id="view-inventory" class="view">
   <div class="vh"><h1>持ちもの台帳</h1><span class="sub">ここに登録した商品にだけ、実体験を書けます</span>
@@ -299,6 +314,17 @@
       <button class="ghost" id="btnTestRakuten">接続を試す</button>
       <span class="note" id="settingsSaved"></span></div>
     <p class="note">鍵は <code>toco-app/data/secrets.json</code> にだけ保存され、GitHubには送られません。</p>
+  </div>
+
+  <div class="card">
+    <h3>もしもアフィリエイト</h3>
+    <p class="note">商品カードのリンクに使います。もしもには公開APIが無いので、
+      管理画面で発行したリンクを1本貼っていただければ、そこから型を読み取ります。</p>
+    <div id="moshimoState"></div>
+    <label>かんたんリンクのコードを貼り付け
+      <textarea id="setMoshimo" rows="4" placeholder="&lt;!-- START MoshimoAffiliateEasyLink --&gt; から始まるコードを、そのまま貼ってください"></textarea></label>
+    <div class="row"><button class="primary" id="btnReadMoshimo">読み取る</button>
+      <span class="note" id="moshimoNote">商品は何でも構いません。リンクの型さえ分かれば十分です。</span></div>
   </div>
 
   <div class="card">
