@@ -423,6 +423,7 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 .contact-form{margin:24px 0}.contact-form iframe{width:100%;border:0;border-radius:12px;background:#fff}
 .mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}
 .link-todo{color:inherit}
+.link-todo-card{margin:0 0 1.8em;padding:12px 16px;border:1px dashed #e0c9c4;border-radius:10px;background:#fffaf6;color:#a3968f;font-size:12px}
 .draft-note{max-width:900px;margin:0 auto 14px;padding:11px 20px;border-radius:10px;background:#fbf1e1;color:#8a6d3b;font-size:12px;line-height:1.7}
 .entry-content mark.hl{background:linear-gradient(transparent 56%, rgba(239,174,179,.5) 56%);color:inherit;font-weight:700;padding:0 1px}
 .entry-content figure.ph{margin:26px 0}.entry-content figure.ph img{display:block;width:100%;height:auto;border-radius:12px}.entry-content figure.ph figcaption{margin-top:8px;color:#a3968f;font-size:11px;line-height:1.7;text-align:center}

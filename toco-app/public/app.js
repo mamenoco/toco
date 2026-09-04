@@ -1008,6 +1008,10 @@ async function renderPreview(opts) {
     d.addEventListener('selectionchange', updateMarkTools);
     d.addEventListener('mouseup', updateMarkTools);
     d.addEventListener('keyup', updateMarkTools);
+    d.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('[data-ln]');
+      if (b) LAST_BLOCK = b.getAttribute('data-ln').split(',').map(Number);
+    });
     d.addEventListener('dblclick', (e) => {
       const b = e.target.closest && e.target.closest('[data-ln]');
       if (b) openBlockEditor(b, d);
@@ -1180,6 +1184,42 @@ $('#btnBoldToMark').addEventListener('click', async () => {
 // 本文（Markdown）の該当行だけを取り出して編集し、書き戻します。
 // 記事全体の長いテキスト欄をスクロールしなくて済みます。
 let EDITING = null;
+let LAST_BLOCK = null;   // プレビューで最後にクリックした段落の行範囲
+
+// ---- 好きな場所に記事カードを入れる ----
+$('#btnInsertCard').addEventListener('click', async () => {
+  if (!CURRENT) return;
+  const r = await api('link-targets');
+  const list = r.targets.filter((t) => t.slug !== CURRENT.slug);
+  if (!list.length) return toast('入れられる記事がまだありません');
+
+  const where = LAST_BLOCK
+    ? '選んだ段落の下に入れます'
+    : '記事の最後に入れます（プレビューで段落をクリックすると、その下に入れられます）';
+
+  modal(`<h3>記事カードを入れる</h3>
+    <p class="note">${esc(where)}</p>
+    <label>どの記事のカードを入れますか
+      <select id="cardPick" size="${Math.min(10, list.length)}" style="height:auto">
+        ${list.map((t) => `<option value="${esc(t.slug)}">［${esc(t.kind)}］${esc(t.title)}</option>`).join('')}
+      </select></label>
+    <div class="row end"><button class="ghost" id="cardCancel">やめる</button>
+      <button class="primary" id="cardOk">入れる</button></div>`);
+  $('#cardCancel').onclick = closeModal;
+  $('#cardOk').onclick = async () => {
+    const slug = $('#cardPick').value;
+    if (!slug) return toast('記事を選んでください');
+    const lines = $('#articleText').value.split('\n');
+    const at = LAST_BLOCK ? LAST_BLOCK[1] + 1 : lines.length;
+    lines.splice(at, 0, '', `{{card:${slug}}}`);
+    $('#articleText').value = lines.join('\n').replace(/\n{3,}/g, '\n\n');
+    closeModal();
+    await saveProject({ article: $('#articleText').value });
+    updateChars();
+    await renderPreview({ keepScroll: true, skipBuild: true });
+    toast('記事カードを入れました');
+  };
+});
 
 function openBlockEditor(block, d) {
   if (EDITING) return;

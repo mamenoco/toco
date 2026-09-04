@@ -62,6 +62,7 @@ function render(md, opts) {
   const trackSource = !!options.trackSource;
   const product = options.product || ((id) => `<!-- product not found: ${esc(id)} -->`);
   const ranking = options.ranking || (() => '');
+  const card = options.card || (() => '');
   LINK_RESOLVER = options.link || null;
   LINK_CARDS = [];
   const pendingLinks = [];
@@ -148,6 +149,11 @@ function render(md, opts) {
     // 各モールの検索結果へのリンク（記事末の「ほかの商品も見る」欄）
     const rm = line.match(/^\{\{ranking:(.+)\}\}$/);
     if (rm) { push(ranking(rm[1].trim())); i++; continue; }
+
+    // 記事カード。好きな場所に置けます。
+    // {{link:…}} が文中のリンク＋カードなのに対し、こちらはカードだけです。
+    const cm = line.match(/^\{\{card:([a-z0-9-]+)\}\}$/);
+    if (cm) { push(card(cm[1])); i++; continue; }
 
     // 見出し
     let m = line.match(/^(#{1,4})\s+(.*)$/);

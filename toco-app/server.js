@@ -419,6 +419,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // 記事カードとして差し込める先の一覧
+    if (p === '/api/link-targets') {
+      const list = articles.list()
+        .filter((a) => a.status === 'publish')
+        .map((a) => ({ slug: a.slug, title: a.title, kind: '記事' }));
+      const pagesDir = path.join(ROOT, '..', 'pages');
+      if (fs.existsSync(pagesDir)) {
+        fs.readdirSync(pagesDir).filter((f) => f.endsWith('.md')).forEach((f) => {
+          const slug = f.replace(/\.md$/, '');
+          const { meta } = articles.parse(fs.readFileSync(path.join(pagesDir, f), 'utf8'));
+          list.push({ slug, title: meta.title || slug, kind: 'ページ' });
+        });
+      }
+      return send(res, 200, { targets: list });
+    }
+
     // ===== 記事内リンクの待ち行列 =====
     // 本文の {{link:スラッグ|文字}} を集めて、まだ書いていない記事を一覧にします。
     if (p === '/api/links/pending') {
@@ -482,6 +498,15 @@ const server = http.createServer(async (req, res) => {
 
       const saved = writeArticle(pr, body.article != null ? body.article : null, patch);
       pr.status = saved.meta.status === 'publish' ? '公開' : '下書き';
+
+      // 記事ネタ側の状態も合わせます。合っていないと一覧が実態とずれます。
+      if (pr.ideaId) {
+        const idea = (db.ideas || []).find((x) => x.id === pr.ideaId);
+        if (idea) {
+          idea.status = saved.meta.status === 'publish' ? '公開' : '作成中';
+          if (!idea.slug && pr.slug) idea.slug = pr.slug;
+        }
+      }
       DB.saveDb(db);
       return send(res, 200, { ok: true, article: saved, project: projectSummary(pr) });
     }

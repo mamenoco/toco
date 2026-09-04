@@ -244,6 +244,9 @@ function buildAssets() {
       '.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}',
       // まだ書いていない記事へのリンク（読者には普通の文字として見えます）
       '.link-todo{color:inherit}',
+      // まだ公開していない記事のカード（プレビューでだけ見えます）
+      '.link-todo-card{margin:0 0 1.8em;padding:12px 16px;border:1px dashed #e0c9c4;'
+      + 'border-radius:10px;background:#fffaf6;color:#a3968f;font-size:12px}',
       // 下書きプレビューの帯
       '.draft-note{max-width:900px;margin:0 auto 14px;padding:11px 20px;border-radius:10px;'
       + 'background:#fbf1e1;color:#8a6d3b;font-size:12px;line-height:1.7}',
@@ -426,6 +429,22 @@ function shortDesc(text) {
   return at >= 24 ? cut.slice(0, at + 1) : cut.slice(0, 46) + '…';
 }
 
+// 単独の記事カード（{{card:スラッグ}}）
+function articleCard(slug, ctx) {
+  const a = ctx.bySlug[slug];
+  if (!a) return '<!-- 記事が見つかりません: ' + esc(slug) + ' -->';
+  if (a.status !== 'publish') {
+    return '<div class="link-todo-card">' + esc(a.title)
+      + '（下書きのため、公開されるとカードが出ます）</div>';
+  }
+  return '<div class="rel-cards"><a class="related-link has-img" href="/' + esc(slug) + '/">'
+    + '<img src="' + esc(cardImage(a)) + '" alt="" loading="lazy">'
+    + '<span class="rel-text"><small>あわせて読みたい</small>'
+    + '<strong>' + esc(a.title) + '</strong>'
+    + (a.description ? '<em>' + esc(shortDesc(a.description)) + '</em>' : '')
+    + '</span></a></div>';
+}
+
 function makeLinkResolver(ctx) {
   // 同じ記事のカードが何枚も出ないよう、1記事につき1回だけにします
   const carded = new Set();
@@ -456,6 +475,7 @@ function buildSingle(a, prev, next, ctx) {
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
+    card: (slug) => articleCard(slug, ctx),
   });
 
   const hero = a.eyecatch
@@ -508,6 +528,7 @@ function buildPage(p, ctx) {
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
+    card: (slug) => articleCard(slug, ctx),
   });
   let body = r.html.replace(/\{\{contact-form\}\}/g, () => contactForm());
   // 目次は記事と同じく、最初の見出しの直前に置きます
@@ -700,6 +721,7 @@ function renderArticle(md, opts) {
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
+    card: (slug) => articleCard(slug, ctx),
     trackSource: !!(opts && opts.trackSource),
   });
   return { html: r.html, toc: r.toc, headings: r.headings };
