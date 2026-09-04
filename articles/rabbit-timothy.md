@@ -6,7 +6,8 @@ tags: [牧草, チモシー, 選び方]
 date: 2026-09-04
 updated: 2026-09-04
 description: うさぎのチモシーは刈り取りの時期と硬さで決まります。7商品を比較表で並べ、選び方の5つのポイントとあわせて紹介します。
-status: draft
+eyecatch: /assets/eyecatch/rabbit-timothy.jpg
+status: publish
 ---
 # うさぎのチモシーのおすすめ7選｜牧草の選び方や食べない子向けの商品まで紹介
 
