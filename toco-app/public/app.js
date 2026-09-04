@@ -39,7 +39,7 @@ function flash(el, msg) {
 const RENDER = {
   home: renderHome, ideas: renderIdeas, articles: renderArticles,
   products: renderProducts, inventory: renderInventory,
-  publish: renderPublish, settings: renderSettings,
+  publish: renderPublish, settings: renderSettings, video: renderVideo,
 };
 
 function show(view, keepHash) {
@@ -1039,6 +1039,7 @@ async function renderProducts() {
     : '<div class="empty">まだ商品がありません。記事の「商品を選ぶ」で選んだあと、そこから登録できます。</div>';
 
   const missing = PRODUCTS.filter((p) => !(p.amazon && p.amazon.asin));
+  renderCatch(missing);
   if (missing.length) {
     $('#prodList').insertAdjacentHTML('beforeend', `<div class="card">
       <h3>ASINをまとめて登録 <span class="tag warn">${missing.length}件 未登録</span></h3>
@@ -1075,6 +1076,80 @@ async function renderProducts() {
     await api('products/delete', { id: p.id });
     renderProducts();
   }));
+}
+
+// ---- クリップボード取り込み ----
+// Amazonの商品ページを開いてURLをコピーするだけで、順番に登録していきます。
+// PA-APIが使えるようになれば、この手作業ごと不要になります。
+let CATCH_TIMER = null, CATCH_LAST = '', CATCH_QUEUE = [], CATCH_AT = 0;
+
+function stopCatch() {
+  clearInterval(CATCH_TIMER); CATCH_TIMER = null;
+  const b = $('#btnCatch'); if (b) { b.textContent = '取り込みモードを開始'; b.classList.add('primary'); }
+  const s = $('#catchState'); if (s) s.innerHTML = '';
+}
+
+function renderCatch(missing) {
+  if (!missing.length) return;
+  $('#prodList').insertAdjacentHTML('beforeend', `<div class="card">
+    <h3>Amazonの商品ページをコピーするだけで登録 <span class="tag warn">${missing.length}件 未登録</span></h3>
+    <p class="note">「取り込みモードを開始」を押すと、1商品ずつ順番に案内します。
+      Amazonで商品ページを開いて<b>URLをコピー（⌘L → ⌘C）</b>するだけで、自動で登録されて次に進みます。
+      アプリに渡るのはAmazonの商品URLだけで、ほかのコピー内容は読み取りません。</p>
+    <div class="row"><button class="primary" id="btnCatch">取り込みモードを開始</button>
+      <button class="ghost" id="btnCatchSkip" style="display:none">この商品は飛ばす</button></div>
+    <div id="catchState"></div>
+  </div>`);
+
+  $('#btnCatch').addEventListener('click', () => {
+    if (CATCH_TIMER) return stopCatch();
+    CATCH_QUEUE = missing.slice(); CATCH_AT = 0; CATCH_LAST = '';
+    $('#btnCatch').textContent = '取り込みモードを止める';
+    $('#btnCatch').classList.remove('primary');
+    $('#btnCatchSkip').style.display = '';
+    showCatch();
+    CATCH_TIMER = setInterval(pollClipboard, 1200);
+  });
+  $('#btnCatchSkip').addEventListener('click', () => { CATCH_AT++; showCatch(); });
+}
+
+function showCatch() {
+  const p = CATCH_QUEUE[CATCH_AT];
+  if (!p) {
+    stopCatch();
+    $('#btnCatchSkip').style.display = 'none';
+    toast('取り込みが終わりました');
+    return renderProducts();
+  }
+  $('#catchState').innerHTML = `<div class="phcard" style="margin-top:12px">
+    <div class="phhead">${CATCH_AT + 1} / ${CATCH_QUEUE.length}　${esc(p.name)}</div>
+    <p class="note" style="margin:0 0 8px">この商品のAmazonページを開いて、URLをコピーしてください。</p>
+    <a class="tag warn" href="https://www.amazon.co.jp/s?k=${encodeURIComponent(p.name)}"
+       target="_blank" rel="noopener">Amazonで探す ↗</a>
+    <span class="note" style="margin-left:10px"><span class="spin"></span>コピーを待っています…</span>
+  </div>`;
+}
+
+async function pollClipboard() {
+  const p = CATCH_QUEUE[CATCH_AT];
+  if (!p) return showCatch();
+  let r;
+  try { r = await (await fetch('/api/clipboard/amazon')).json(); } catch (e) { return; }
+  if (!r.asin || r.asin === CATCH_LAST) return;
+  CATCH_LAST = r.asin;
+
+  // 同じASINが別の商品に登録されていないか確かめる（取り違えを防ぐため）
+  const dup = PRODUCTS.find((x) => x.amazon && x.amazon.asin === r.asin);
+  if (dup) {
+    toast(`このASINは「${dup.name}」に登録済みです。別の商品ページを開いてください`);
+    return;
+  }
+  await api('products/save', { product: { id: p.id, name: p.name, amazonUrl: r.url } });
+  toast(`${p.name} に ${r.asin} を登録しました`);
+  CATCH_AT++;
+  const fresh = await api('products');
+  PRODUCTS = fresh.products;
+  showCatch();
 }
 
 function productForm(item) {
@@ -1283,6 +1358,7 @@ function renderSettings() {
   const s = STATE.settings || {};
   $('#setRakutenId').value = s.rakutenAppId || '';
   $('#setRakutenKey').value = s.rakutenAccessKey || '';
+  $('#setFalKey').value = s.falKey || '';
   $('#setModel').value = s.aiModel || 'claude-opus-5';
 
   const m = s.moshimo || {};
@@ -1315,6 +1391,209 @@ $('#btnSaveSettings').addEventListener('click', async () => {
 });
 $('#setModel').addEventListener('change', () => $('#btnSaveSettings').click());
 
+$('#btnSaveFal').addEventListener('click', async () => {
+  await api('settings/save', { falKey: $('#setFalKey').value.trim() });
+  await refresh();
+  flash('#falSaved', '保存しました');
+});
+
+// ================================================================
+// 動画（fal.ai）
+// ================================================================
+let VIDEO_MODELS = [];
+
+async function renderVideo() {
+  const r = await api('video/models');
+  VIDEO_MODELS = r.models;
+  $('#videoKeyNote').hidden = r.hasKey;
+  $('#btnVideoGen').disabled = !r.hasKey;
+  const sel = $('#vidModel');
+  const cur = sel.value;
+  sel.innerHTML = r.models.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
+  if (cur) sel.value = cur;
+  await renderVideoList();
+  await renderStamps();
+}
+
+async function renderVideoList() {
+  const { videos } = await api('video/list');
+  const sel = $('#stVideo');
+  const cur = sel.value;
+  sel.innerHTML = videos.length
+    ? videos.map((v) => `<option value="${v.id}">${esc(v.createdAt.slice(5, 16).replace('T', ' '))} ${esc(v.prompt.slice(0, 40))}</option>`).join('')
+    : '<option value="">（まだ動画がありません）</option>';
+  if (cur && videos.some((v) => String(v.id) === cur)) sel.value = cur;
+  $('#vidList').innerHTML = videos.length
+    ? videos.map((v) => `
+      <div class="row" style="align-items:flex-start;margin-bottom:14px;gap:14px">
+        <video src="${v.src}" controls preload="metadata" style="width:320px;max-width:100%;border-radius:8px;background:#000"></video>
+        <div style="flex:1;min-width:200px">
+          <div class="t">${esc(v.prompt)}</div>
+          <p class="note">${esc(v.model)} ／ ${esc(v.createdAt.slice(0, 16).replace('T', ' '))} ／ ${Math.round(v.bytes / 1024)} KB ／ ${v.seconds} 秒で完成</p>
+          <div class="row"><a class="ghost" href="${v.src}" download="${v.id}.mp4">ダウンロード</a>
+            <button class="ghost" data-del-video="${v.id}">削除</button></div>
+        </div>
+      </div>`).join('')
+    : '<p class="note">まだありません。</p>';
+  $$('#vidList [data-del-video]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('この動画を削除しますか？')) return;
+    await api('video/delete', { id: b.dataset.delVideo });
+    await renderVideoList();
+  }));
+}
+
+function readFileAsDataUri(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(new Error('画像を読めませんでした'));
+    fr.readAsDataURL(file);
+  });
+}
+
+// 依頼を出して、できあがるまで様子を見る。state には途中経過を書きます。
+async function runVideoJob(btn, state, payload) {
+  btn.disabled = true;
+  state.textContent = '依頼しています…';
+  try {
+    const r = await api('video/generate', payload);
+    while (true) {
+      await new Promise((res) => setTimeout(res, 3000));
+      const s = await fetch('/api/video/status?jobId=' + r.jobId).then((x) => x.json());
+      if (s.error && !s.status) throw new Error(s.error);
+      if (s.status === 'done') {
+        state.textContent = `できました（${s.seconds} 秒）`;
+        toast('動画ができました');
+        await renderVideoList();
+        break;
+      }
+      if (s.status === 'error') throw new Error(s.error);
+      state.textContent = s.status === 'queued'
+        ? `順番待ち${s.queuePosition != null ? `（前に ${s.queuePosition} 件）` : ''}… ${s.seconds} 秒`
+        : s.status === 'downloading' ? 'ダウンロード中…'
+        : `生成中… ${s.seconds} 秒 ${s.logs.slice(-1)[0] || ''}`;
+    }
+  } catch (err) {
+    state.textContent = '失敗: ' + err.message;
+  } finally { btn.disabled = false; }
+}
+
+$('#btnVideoGen').addEventListener('click', async (e) => {
+  const prompt = $('#vidPrompt').value.trim();
+  if (!prompt) return toast('動画の説明を書いてください');
+  const model = $('#vidModel').value;
+  const preset = VIDEO_MODELS.find((m) => m.id === model);
+  let imageUrl = $('#vidImageUrl').value.trim();
+  const file = $('#vidImageFile').files[0];
+  if (file) imageUrl = await readFileAsDataUri(file);
+  if (preset && preset.kind === 'image' && !imageUrl) return toast('このモデルは画像が必要です');
+  await runVideoJob(e.target, $('#vidState'), { prompt, model, imageUrl, extra: $('#vidExtra').value.trim() });
+});
+
+// ---------- 動く LINE スタンプ ----------
+const STAMP_MODEL = 'minimax/h3-max-turbo/image-to-video';
+
+$('#btnStampVideo').addEventListener('click', async (e) => {
+  const file = $('#stSheet').files[0];
+  if (!file) return toast('シート画像を選んでください');
+  const prompt = $('#stPrompt').value.trim();
+  if (!prompt) return toast('動きの指示を書いてください');
+  const imageUrl = await readFileAsDataUri(file);
+  const extra = JSON.stringify({ duration: Number($('#stDuration').value), resolution: $('#stRes').value });
+  $('#stCutGrid').value = $('#stGrid').value;
+  await runVideoJob(e.target, $('#stVidState'), { prompt, model: STAMP_MODEL, imageUrl, extra });
+});
+
+$('#btnStampCut').addEventListener('click', async (e) => {
+  const videoId = $('#stVideo').value;
+  if (!videoId) return toast('もとの動画を選んでください');
+  const [cols, rows] = $('#stCutGrid').value.split('x').map(Number);
+  const btn = e.target, state = $('#stCutState');
+  btn.disabled = true;
+  state.textContent = '切り出しています（1分ほどかかります）…';
+  try {
+    const r = await api('stamp/cut', {
+      videoId, cols, rows,
+      total: Number($('#stTotal').value), loops: Number($('#stLoops').value), frames: Number($('#stFrames').value),
+      start: Number($('#stStart').value) || 0, end: $('#stEnd').value ? Number($('#stEnd').value) : 0,
+      keyColor: $('#stKey').value, similarity: Number($('#stSim').value), blend: Number($('#stBlend').value),
+    });
+    const over = r.set.stamps.filter((s) => s.over).length;
+    state.textContent = `${r.set.stamps.length} 個できました` + (over ? `（${over} 個は 300KB を超えています）` : '');
+    await renderStamps();
+    $('#stSets').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    state.textContent = '失敗: ' + err.message;
+  } finally { btn.disabled = false; }
+});
+
+let STAMP_PICKS = []; // チェックした順番 [{setId, n}]
+
+async function renderStamps() {
+  const { sets, zips, maxBytes } = await api('stamp/list');
+  STAMP_PICKS = STAMP_PICKS.filter((p) => sets.some((s) => s.id === p.setId));
+  $('#stZips').innerHTML = zips.length
+    ? '<p class="note">作った zip：' + zips.slice(0, 5).map((z) =>
+      `<a href="/stamps/zips/${encodeURIComponent(z.file)}" download>${esc(z.file)}</a>（${Math.round(z.bytes / 1024)} KB）`).join(' ／ ') + '</p>'
+    : '';
+  $('#stSets').innerHTML = sets.length ? sets.map((s) => `
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line2)">
+      <div class="row" style="justify-content:space-between">
+        <div><b>${esc(s.createdAt.slice(0, 16).replace('T', ' '))}</b>
+          <span class="note">横${s.cols}×縦${s.rows} ／ ${s.total}秒・${s.loops}回ループ・${s.frames}コマ ／ 区間 ${s.start}〜${s.end}秒${s.keyColor ? ' ／ 透過 ' + esc(s.keyColor) : ''}</span></div>
+        <div class="row"><button class="ghost" data-pick-all="${s.id}">全部えらぶ</button>
+          <button class="ghost" data-del-set="${s.id}">削除</button></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px">
+        ${s.stamps.map((st) => {
+          const picked = STAMP_PICKS.findIndex((p) => p.setId === s.id && p.n === st.n);
+          return `<label style="display:block;border:2px solid ${picked >= 0 ? 'var(--pink)' : 'var(--line)'};border-radius:10px;padding:8px;cursor:pointer;
+              background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/16px 16px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <input type="checkbox" data-pick="${s.id}:${st.n}" ${picked >= 0 ? 'checked' : ''}>
+              <span class="tag ${st.over ? 'err' : 'ok'}">${picked >= 0 ? (picked + 1) + '番 ／ ' : ''}${Math.round(st.bytes / 1024)} KB</span></div>
+            <img src="/stamps/${s.id}/${st.file}?t=${s.id}" style="width:100%;height:120px;object-fit:contain;display:block;margin:6px 0">
+            <div class="note" style="margin:0;text-align:center">${st.n}：${st.width}×${st.height}・${st.frames}コマ${st.over ? '・容量オーバー' : ''}</div>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>`).join('') : '<p class="note">まだスタンプはありません。②で動画から切り出してください。</p>';
+
+  $$('#stSets [data-pick]').forEach((cb) => cb.addEventListener('change', () => {
+    const [setId, n] = cb.dataset.pick.split(':');
+    const pick = { setId, n: Number(n) };
+    if (cb.checked) STAMP_PICKS.push(pick);
+    else STAMP_PICKS = STAMP_PICKS.filter((p) => !(p.setId === setId && p.n === pick.n));
+    renderStamps();
+  }));
+  $$('#stSets [data-pick-all]').forEach((b) => b.addEventListener('click', () => {
+    const s = sets.find((x) => x.id === b.dataset.pickAll);
+    s.stamps.forEach((st) => {
+      if (!STAMP_PICKS.some((p) => p.setId === s.id && p.n === st.n)) STAMP_PICKS.push({ setId: s.id, n: st.n });
+    });
+    renderStamps();
+  }));
+  $$('#stSets [data-del-set]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('このセットのスタンプを削除しますか？')) return;
+    await api('stamp/delete-set', { id: b.dataset.delSet });
+    await renderStamps();
+  }));
+  $('#stZipState').textContent = STAMP_PICKS.length
+    ? `${STAMP_PICKS.length} 個えらんでいます` + ([8, 16, 24].includes(STAMP_PICKS.length) ? '' : '（LINE の1セットは 8・16・24 個です）')
+    : '';
+}
+
+$('#btnStampZip').addEventListener('click', async (e) => {
+  if (!STAMP_PICKS.length) return toast('スタンプにチェックを入れてください');
+  const btn = e.target;
+  btn.disabled = true;
+  try {
+    const r = await api('stamp/zip', { picks: STAMP_PICKS, name: $('#stZipName').value.trim() });
+    toast(`${r.count} 個を ${r.file} にまとめました`);
+    await renderStamps();
+  } finally { btn.disabled = false; }
+});
+
 $('#btnTestRakuten').addEventListener('click', async (e) => {
   e.target.disabled = true;
   try {
@@ -1324,9 +1603,13 @@ $('#btnTestRakuten').addEventListener('click', async (e) => {
 });
 
 $('#btnMyIp').addEventListener('click', async () => {
-  $('#myIpNote').textContent = '調べています…';
+  $('#myIpNote').innerHTML = '<span class="spin"></span>調べています…';
   const r = await api('myip');
-  $('#myIpNote').textContent = `IPv4 ${r.ipv4 || '不明'}${r.ipv6 ? '　IPv6 ' + r.ipv6 : ''}`;
+  $('#myIpNote').innerHTML = `<b>${esc(r.ipv4 || '不明')}</b>${r.ipv6 ? '　IPv6 ' + esc(r.ipv6) : ''}
+    <button class="link" id="btnCopyIp">コピー</button>
+    <a href="https://webservice.rakuten.co.jp/app/list" target="_blank" rel="noopener">楽天の管理画面を開く ↗</a>`;
+  if ($('#btnCopyIp')) $('#btnCopyIp').onclick = () =>
+    navigator.clipboard.writeText(r.ipv4 || '').then(() => toast('コピーしました'));
 });
 
 $('#btnPingAi').addEventListener('click', async () => {

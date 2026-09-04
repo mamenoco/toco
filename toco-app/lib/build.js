@@ -481,7 +481,18 @@ function buildExtras(published, ctx, extra) {
 
   // Cloudflare Pages が配る *.pages.dev のURLを検索結果に出さない。
   // 本番（toco-to.com）と中身が同じなので、両方が拾われると重複扱いになるため。
-  write('_headers', 'https://*.pages.dev/*\n  X-Robots-Tag: noindex\n');
+  // ホスト名にワイルドカードは使えないため、実際のホスト名で指定します。
+  // 2行目はプレビュー用のデプロイ（<ハッシュ>.<プロジェクト>.pages.dev）向け。
+  if (config.pagesDevHost) {
+    write('_headers', [
+      `https://${config.pagesDevHost}/*`,
+      '  X-Robots-Tag: noindex',
+      '',
+      `https://:preview.${config.pagesDevHost}/*`,
+      '  X-Robots-Tag: noindex',
+      '',
+    ].join('\n'));
+  }
 
   // 検索用のインデックス
   write('search-index.json', JSON.stringify(published.map((a) => ({

@@ -4,7 +4,9 @@ slug: rabbit-cage
 category: house
 tags: [ケージ選び, 掃除, 初心者]
 date: 2026-09-03
+updated: 2026-09-04
 description: うさぎのケージは幅・床の素材・掃除のしやすさで決まります。7台を比較表で並べ、選び方の5つのポイントとあわせて紹介します。
+eyecatch: /assets/eyecatch/rabbit-cage.jpg
 status: publish
 ---
 # うさぎのケージのおすすめ7選｜サイズの選び方や掃除しやすいタイプまで詳しく紹介

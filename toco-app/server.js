@@ -13,6 +13,8 @@
 //   lib/markdown.js   Markdown → HTML
 //   lib/build.js      サイトの書き出し
 //   lib/deploy.js     Git で公開する
+//   lib/fal.js        fal.ai での動画生成
+//   lib/stamps.js     動く LINE スタンプの切り出しと zip 化
 
 const http = require('http');
 const fs = require('fs');
@@ -31,7 +33,10 @@ const deploy = require('./lib/deploy.js');
 const siteConfig = require('./lib/site-config.js');
 const affiliate = require('./lib/affiliate.js');
 const products = require('./lib/products.js');
+const curate = require('./lib/curate.js');
 const preview = require('./lib/preview-server.js');
+const fal = require('./lib/fal.js');
+const stamps = require('./lib/stamps.js');
 
 const ROOT = __dirname;
 const PORT = 4567;
@@ -149,6 +154,23 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
     }
+    // /videos/ は fal.ai で作った動画（toco-app/videos/）を配ります。
+    if (p.startsWith('/videos/')) {
+      const v = path.join(fal.OUT_DIR, path.basename(p));
+      if (fs.existsSync(v) && fs.statSync(v).isFile()) {
+        return send(res, 200, fs.readFileSync(v), MIME[path.extname(v)] || 'video/mp4');
+      }
+      return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+    }
+    // /stamps/ は切り出したスタンプ（toco-app/stamps/）を配ります。
+    if (p.startsWith('/stamps/')) {
+      const rel = path.normalize(decodeURIComponent(p.slice('/stamps/'.length))).replace(/^(\.\.[/\\])+/, '');
+      const f = path.join(stamps.STAMP_DIR, rel);
+      if (f.startsWith(stamps.STAMP_DIR) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+        return send(res, 200, fs.readFileSync(f), f.endsWith('.zip') ? 'application/zip' : 'image/png');
+      }
+      return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
+    }
     const file = p === '/' ? '/index.html' : p;
     const full = path.join(ROOT, 'public', path.normalize(file).replace(/^(\.\.[/\\])+/, ''));
     if (fs.existsSync(full) && fs.statSync(full).isFile()) {
@@ -212,6 +234,19 @@ const server = http.createServer(async (req, res) => {
       if (src.amazonUrl) src.amazon = Object.assign({}, src.amazon, { asin: affiliate.asinFromUrl(src.amazonUrl) });
       delete src.amazonUrl; delete src.idHint;
       return send(res, 200, { ok: true, product: products.upsert(Object.assign({}, src, { id })) });
+    }
+
+    // クリップボードの取り込み。
+    // 画面で「取り込みモード」を開いているあいだだけ呼ばれます。
+    // Amazonの商品URL以外は返さないので、関係のない内容がアプリに渡ることはありません。
+    if (p === '/api/clipboard/amazon') {
+      let text = '';
+      try { text = execSync('pbpaste', { encoding: 'utf8', timeout: 3000 }); }
+      catch (e) { return send(res, 200, { asin: '', url: '' }); }
+      const m = String(text).match(/https?:\/\/(?:www\.)?amazon\.co\.jp\/[^\s"'<>]*/);
+      if (!m) return send(res, 200, { asin: '', url: '' });
+      const asin = affiliate.asinFromUrl(m[0]);
+      return send(res, 200, { asin, url: asin ? m[0] : '' });
     }
 
     if (p === '/api/products/delete') {
@@ -407,6 +442,30 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ===== 商品検索・口コミ =====
+    // 候補の自動選出。
+    // 楽天の検索結果は同じ商品が複数ショップから出てくるため、
+    // まとめてから人気・評価・価格帯で10点前後に絞ります。
+    if (p === '/api/search/curate') {
+      if (!settings.rakutenAppId) {
+        return send(res, 200, { error: '設定画面で楽天アプリIDを登録してください。' });
+      }
+      const keyword = String(body.keyword || '').trim();
+      if (!keyword) return send(res, 200, { error: 'キーワードを入れてください' });
+
+      // 1ページ30件が上限なので、2ページ取って母数を増やします
+      let items = [];
+      for (let page = 1; page <= 2; page++) {
+        const part = await research.rakutenSearch(settings.rakutenAppId,
+          settings.rakutenAccessKey, keyword, 30, page);
+        items = items.concat(part);
+        if (part.length < 30) break;
+        await new Promise((r) => setTimeout(r, 1100));   // 連続アクセスを避ける
+      }
+
+      const r = curate.curate(items, { want: Number(body.want) || 10, inventory: db.inventory });
+      return send(res, 200, r);
+    }
+
     if (p === '/api/search') {
       if (!settings.rakutenAppId) {
         return send(res, 200, { error: '設定画面で楽天アプリIDを登録してください。' });
@@ -495,6 +554,84 @@ const server = http.createServer(async (req, res) => {
         try { job.child.kill(); } catch (e) {}
       }
       return send(res, 200, { ok: true });
+    }
+
+    // ===== 動画生成（fal.ai） =====
+    if (p === '/api/video/models') {
+      return send(res, 200, { models: fal.PRESETS, hasKey: !!settings.falKey });
+    }
+
+    if (p === '/api/video/generate') {
+      if (!settings.falKey) return send(res, 200, { error: '設定画面で fal.ai の API キーを入れてください。' });
+      const prompt = String(body.prompt || '').trim();
+      if (!prompt) return send(res, 200, { error: '動画の説明（プロンプト）を書いてください。' });
+      const model = String(body.model || '').trim();
+      if (!model) return send(res, 200, { error: 'モデルを選んでください。' });
+      const preset = fal.PRESETS.find((m) => m.id === model);
+      let extra = {};
+      if (body.extra) {
+        try { extra = typeof body.extra === 'string' ? JSON.parse(body.extra) : body.extra; }
+        catch (e) { return send(res, 200, { error: '追加パラメータの JSON が読めません。' }); }
+      }
+      const input = Object.assign({}, preset ? preset.input : {}, { prompt }, extra);
+      if (body.imageUrl) input.image_url = String(body.imageUrl);
+      if ((preset && preset.kind === 'image') && !input.image_url) {
+        return send(res, 200, { error: 'このモデルは画像が必要です。画像を選ぶか URL を入れてください。' });
+      }
+      const jobId = fal.start(settings.falKey, { model, input });
+      return send(res, 200, { ok: true, jobId });
+    }
+
+    if (p === '/api/video/status') {
+      const job = fal.JOBS[u.searchParams.get('jobId')];
+      if (!job) return send(res, 200, { error: '実行が見つかりません' });
+      return send(res, 200, {
+        status: job.status,
+        queuePosition: job.queuePosition ?? null,
+        logs: job.logs || [],
+        seconds: Math.round((Date.now() - job.startedAt) / 1000),
+        file: job.file ? '/videos/' + path.basename(job.file) : '',
+        error: job.error || '',
+      });
+    }
+
+    if (p === '/api/video/list') {
+      return send(res, 200, { videos: fal.list().map((v) => Object.assign({}, v, { src: '/videos/' + v.id + '.mp4' })) });
+    }
+
+    if (p === '/api/video/delete') {
+      return send(res, 200, { ok: fal.remove(String(body.id || '')) });
+    }
+
+    // ===== 動く LINE スタンプ =====
+    if (p === '/api/stamp/list') {
+      return send(res, 200, { sets: stamps.list(), zips: stamps.listZips(), maxBytes: stamps.MAX_BYTES });
+    }
+
+    if (p === '/api/stamp/cut') {
+      const id = String(body.videoId || '');
+      if (!/^\d+$/.test(id)) return send(res, 200, { error: '動画を選んでください。' });
+      const video = path.join(fal.OUT_DIR, id + '.mp4');
+      if (!fs.existsSync(video)) return send(res, 200, { error: '動画が見つかりません。' });
+      try {
+        const meta = stamps.cut(video, body);
+        return send(res, 200, { ok: true, set: meta });
+      } catch (e) {
+        return send(res, 200, { error: '切り出しに失敗しました: ' + String(e.stderr || e.message || e).slice(0, 400) });
+      }
+    }
+
+    if (p === '/api/stamp/zip') {
+      try {
+        const r = stamps.makeZip(Array.isArray(body.picks) ? body.picks : [], body.name);
+        return send(res, 200, Object.assign({ ok: true }, r));
+      } catch (e) {
+        return send(res, 200, { error: 'zip の作成に失敗しました: ' + String(e.stderr || e.message || e).slice(0, 400) });
+      }
+    }
+
+    if (p === '/api/stamp/delete-set') {
+      return send(res, 200, { ok: stamps.removeSet(String(body.id || '')) });
     }
 
     // ===== 公開前チェック =====

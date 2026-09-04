@@ -63,6 +63,16 @@
 // テーマ本体（theme.js）には手を入れず、WordPressのプラグインが担っていた
 // 動きだけをここで補います。
 (function () {
+  // ---- pages.dev では検索結果に出さない ----
+  // 本番（toco-to.com）と中身が同じページが2つのURLで見えると、重複として扱われます。
+  // _headers でも指定していますが、確実にするためこちらでも入れています。
+  if (/\.pages\.dev$/.test(location.hostname)) {
+    var meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+  }
+
   // ---- 目次の開閉（Table of Contents Plus の代替） ----
   var toc = document.getElementById('toc_container');
   if (toc) {

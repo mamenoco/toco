@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { newId } = require("./db.js");
 
 // ---------- 外部アクセスの制御 ----------
 // レビューページの取得は連続アクセスを避けるため、最短間隔をあけます。
@@ -47,7 +48,7 @@ function htmlToText(html) {
 
 // 2026年の仕様変更で、applicationId（UUID）に加えて accessKey が必須になりました。
 // accessKey は秘密の値なので、URLではなくヘッダーで送ります。
-async function rakutenSearch(appId, accessKey, keyword, hits) {
+async function rakutenSearch(appId, accessKey, keyword, hits, page) {
   if (!accessKey) {
     throw new Error('設定画面で「アクセスキー」も登録してください（2026年からApplication IDだけでは使えません）。');
   }
@@ -55,7 +56,7 @@ async function rakutenSearch(appId, accessKey, keyword, hits) {
     'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701' +
     `?applicationId=${encodeURIComponent(appId)}` +
     `&keyword=${encodeURIComponent(keyword)}` +
-    `&hits=${hits || 30}&sort=-reviewCount&imageFlag=1`;
+    `&hits=${hits || 30}&page=${page || 1}&sort=-reviewCount&imageFlag=1`;
   const res = await fetch(url, { headers: { accessKey } });
   const json = await res.json().catch(() => ({}));
   if (json.error) {
@@ -65,6 +66,13 @@ async function rakutenSearch(appId, accessKey, keyword, hits) {
         + '「Allowed IP addresses」にいまのIPが登録されているかを確認してください）';
     }
     throw new Error(`楽天API: ${msg}`);
+  }
+  if (res.status === 403 || /CLIENT_IP_NOT_ALLOWED/.test(JSON.stringify(json))) {
+    throw new Error(
+      '楽天APIに接続できませんでした（接続元のIPアドレスが許可されていません）。\n'
+      + '楽天ウェブサービスの管理画面で、いまのIPアドレスを「Allowed IP addresses」に追加してください。\n'
+      + 'IPアドレスは、設定画面の「接続元のIPアドレス」で調べられます。\n'
+      + '回線のIPが変わるたびに同じことが起きるため、許可リストを空にしておく運用も選べます。');
   }
   if (!res.ok) throw new Error(`楽天API: HTTP ${res.status}`);
   return (json.Items || []).map((w) => {

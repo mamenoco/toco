@@ -53,5 +53,9 @@ module.exports = {
   // 空のあいだは、ページに「準備中」の案内が出ます。
   contactFormUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSdvQeXbTaEzkmCt6d3cql9dTwZIQu4p9zm4WZCTpfxmF8Mq0w/viewform?embedded=true',
 
+  // Cloudflare Pages が配るホスト名。
+  // 本番（toco-to.com）と中身が同じなので、こちらは検索結果に出さない設定を入れます。
+  pagesDevHost: 'toco-17g.pages.dev',
+
   archivePerPage: 12,
 };

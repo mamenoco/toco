@@ -6,3 +6,9 @@ toco-app/dist/.DS_Store
 .DS_Store
 node_modules/
 articles/work/
+
+# fal.ai で作った動画（大きいので Git に入れない）
+toco-app/videos/
+
+# 切り出したスタンプと申請用 zip
+toco-app/stamps/

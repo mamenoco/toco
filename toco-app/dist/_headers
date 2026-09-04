@@ -1,2 +1,5 @@
-https://*.pages.dev/*
+https://toco-17g.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:preview.toco-17g.pages.dev/*
   X-Robots-Tag: noindex

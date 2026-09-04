@@ -18,6 +18,7 @@
   <button class="nav" data-view="inventory"><span class="ic">☖</span>持ちもの台帳</button>
   <div class="sep"></div>
   <button class="nav" data-view="publish"><span class="ic">↥</span>公開<span class="tail" id="navPublish" hidden></span></button>
+  <button class="nav" data-view="video"><span class="ic">▶</span>動画</button>
   <button class="nav" data-view="settings"><span class="ic">⚙</span>設定</button>
   <div class="sidefoot">
     <a href="https://toco-to.com/" target="_blank">toco-to.com</a><br>
@@ -299,6 +300,108 @@
   </div>
 </section>
 
+<!-- ============ 動画 ============ -->
+<section id="view-video" class="view">
+  <div class="vh"><h1>動画</h1><span class="sub">fal.ai で短い動画を作ります</span></div>
+
+  <div class="card">
+    <h3>動画をつくる</h3>
+    <p class="note" id="videoKeyNote" hidden style="color:var(--err)">設定画面で fal.ai の API キーを入れると使えるようになります。</p>
+    <div class="grid2">
+      <label>モデル<select id="vidModel"></select></label>
+      <label>画像（画像→動画のモデルで使います）
+        <input id="vidImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+    </div>
+    <label>動画の説明（プロンプト）
+      <textarea id="vidPrompt" rows="4" placeholder="例: A white rabbit hopping across a sunlit meadow, slow motion, soft morning light"></textarea></label>
+    <div class="grid2">
+      <label>画像の URL（ファイルの代わりに）<input id="vidImageUrl" placeholder="https://..."></label>
+      <label>追加パラメータ（JSON・省略可）<input id="vidExtra" placeholder='{"duration":10,"aspect_ratio":"9:16","resolution":"480P"}'></label>
+    </div>
+    <div class="row"><button class="primary" id="btnVideoGen">生成する</button>
+      <span class="note" id="vidState"></span></div>
+    <p class="note">できあがるまで 1〜5 分ほどかかります。動画は <code>toco-app/videos/</code> に保存されます（GitHub には送りません）。</p>
+  </div>
+
+  <div class="card">
+    <h3>できた動画</h3>
+    <div id="vidList"></div>
+  </div>
+
+  <div class="card">
+    <h3>動く LINE スタンプ ① シートから動画をつくる</h3>
+    <p class="note">8体のイラストを横4×縦2に並べた1枚の画像を用意します。<b>背景は緑一色（#00FF00）</b>にしておくと、あとで透過にできます。
+      各イラストはマスの中央に置き、マスの端から少し余白をとってください。</p>
+    <div class="grid2">
+      <label>シート画像<input id="stSheet" type="file" accept="image/png,image/jpeg,image/webp"></label>
+      <label>並び（横×縦）
+        <select id="stGrid">
+          <option value="4x2">横4 × 縦2（8体）</option>
+          <option value="2x4">横2 × 縦4（8体）</option>
+          <option value="4x4">横4 × 縦4（16体）</option>
+          <option value="3x3">横3 × 縦3（9体）</option>
+        </select></label>
+    </div>
+    <label>動きの指示（プロンプト）
+      <textarea id="stPrompt" rows="3">Each character stays in its own cell and does a small cute looping motion in place (bouncing, waving, nodding). Keep the flat solid green background exactly as is. No camera movement, no zoom, characters do not overlap or leave their cells.</textarea></label>
+    <div class="grid2">
+      <label>長さ（秒）<select id="stDuration"><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option></select></label>
+      <label>解像度<select id="stRes"><option value="768P">768P（きれい）</option><option value="480P">480P（安い・試作向け）</option></select></label>
+    </div>
+    <div class="row"><button class="primary" id="btnStampVideo">動画をつくる</button><span class="note" id="stVidState"></span></div>
+    <p class="note">MiniMax H3 Max Turbo（画像→動画）を使います。できた動画は上の「できた動画」に並びます。</p>
+  </div>
+
+  <div class="card">
+    <h3>動く LINE スタンプ ② 動画からスタンプを切り出す</h3>
+    <div class="grid2">
+      <label>もとの動画<select id="stVideo"></select></label>
+      <label>並び（横×縦）
+        <select id="stCutGrid">
+          <option value="4x2">横4 × 縦2</option>
+          <option value="2x4">横2 × 縦4</option>
+          <option value="4x4">横4 × 縦4</option>
+          <option value="3x3">横3 × 縦3</option>
+        </select></label>
+    </div>
+    <div class="grid3">
+      <label>ループ込みの再生時間（秒）<select id="stTotal"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></label>
+      <label>ループ回数<select id="stLoops"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></label>
+      <label>コマ数（5〜20）<input id="stFrames" type="number" min="5" max="20" value="15"></label>
+    </div>
+    <div class="grid3">
+      <label>使う区間・開始（秒）<input id="stStart" type="number" min="0" step="0.1" value="0"></label>
+      <label>使う区間・終了（秒・空なら最後まで）<input id="stEnd" type="number" min="0" step="0.1" placeholder="最後まで"></label>
+      <label>背景の透過
+        <select id="stKey">
+          <option value="#00FF00">緑（#00FF00）を透過</option>
+          <option value="#0000FF">青（#0000FF）を透過</option>
+          <option value="">透過しない</option>
+        </select></label>
+    </div>
+    <div class="grid3">
+      <label>透過の強さ（0.1〜0.6）<input id="stSim" type="number" min="0.05" max="0.8" step="0.05" value="0.25"></label>
+      <label>ふちのなじませ（0〜0.3）<input id="stBlend" type="number" min="0" max="0.5" step="0.05" value="0.05"></label>
+      <label>&nbsp;<span class="note">緑がふちに残るときは「強さ」を上げます。イラストまで消えるときは下げます。</span></label>
+    </div>
+    <div class="row"><button class="primary" id="btnStampCut">切り出す</button><span class="note" id="stCutState"></span></div>
+    <p class="note">1ループの長さは「再生時間 ÷ ループ回数」です。標準（3秒・2回）なら1.5秒の動きが2回流れます。
+      最後のコマを先頭に回してあるので、止まったときは動きの終わりのポーズで止まります。</p>
+  </div>
+
+  <div class="card">
+    <h3>動く LINE スタンプ ③ 選んで申請用 zip にする</h3>
+    <p class="note">申請するスタンプにチェックを入れて「zip にする」を押します。チェックした順に 01.png、02.png … と番号が付き、
+      最初の1つから main.png（240×240）と tab.png（96×74）を作ります。LINE の1セットは 8・16・24 個です。</p>
+    <div class="row"><label style="flex:1">zip の名前<input id="stZipName" placeholder="例: usagi-vol1"></label>
+      <button class="primary" id="btnStampZip">選んだものを zip にする</button>
+      <span class="note" id="stZipState"></span></div>
+    <div id="stZips"></div>
+    <div id="stSets"></div>
+  </div>
+</section>
+
 <!-- ============ 設定 ============ -->
 <section id="view-settings" class="view">
   <div class="vh"><h1>設定</h1></div>
@@ -314,6 +417,16 @@
       <button class="ghost" id="btnTestRakuten">接続を試す</button>
       <span class="note" id="settingsSaved"></span></div>
     <p class="note">鍵は <code>toco-app/data/secrets.json</code> にだけ保存され、GitHubには送られません。</p>
+  </div>
+
+  <div class="card">
+    <h3>fal.ai（動画生成）</h3>
+    <p class="note">「動画」画面で使います。<a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener">fal.ai のダッシュボード</a>で発行したキーを入れてください。生成のたびに fal 側で課金されます。</p>
+    <div class="grid2">
+      <label>API キー<input id="setFalKey" type="password" placeholder="key_id:key_secret の形"></label>
+    </div>
+    <div class="row"><button class="primary" id="btnSaveFal">保存</button>
+      <span class="note" id="falSaved"></span></div>
   </div>
 
   <div class="card">

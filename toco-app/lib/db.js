@@ -10,7 +10,7 @@ const DB_PATH = path.join(__dirname, "..", "data", "db.json");
 const SECRET_PATH = path.join(__dirname, "..", "data", "secrets.json");
 // ここに挙げた項目だけ secrets.json に保存します（Gitに入れません）。
 // もしものIDは公開リンクにそのまま出る値なので、秘密扱いにしません。
-const SECRET_KEYS = ["rakutenAppId", "rakutenAccessKey"];
+const SECRET_KEYS = ["rakutenAppId", "rakutenAccessKey", "falKey"];
 
 
 
@@ -18,6 +18,7 @@ const DEFAULT_DB = {
   settings: {
     rakutenAppId: '',
     rakutenAccessKey: '',
+    falKey: '',
     wpUrl: 'https://toco-to.com',
     wpUser: '',
     wpAppPassword: '',
