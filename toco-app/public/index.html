@@ -124,8 +124,14 @@
     <div class="card">
       <h3>口コミを読み込む</h3>
       <p class="note">ボタンを押したときだけ取得します。取得したものは保存され、二度目は取りにいきません。
+        楽天のページに連続でアクセスしないよう、1件ごとに間隔を空けます。
         記事には本文をそのまま載せず、傾向の要約として書きます。</p>
-      <div id="reviewList" class="list"></div>
+      <div class="row">
+        <button class="primary" id="btnFetchAll">まとめて取得</button>
+        <button class="ghost danger" id="btnFetchStop" style="display:none">止める</button>
+        <span class="note" id="fetchAllNote"></span>
+      </div>
+      <div id="reviewList" class="list" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -151,11 +157,20 @@
         <button class="ghost danger" id="btnAiCancel" style="display:none">中止</button>
         <span class="note" id="aiStatus"></span>
       </div>
+      <div id="aiProgress" style="display:none;margin-top:12px">
+        <div class="bar"><span id="aiBar"></span></div>
+        <div class="row" style="margin-top:6px">
+          <span class="note" id="aiPhase"></span>
+          <span class="spacer"></span>
+          <span class="note" id="aiCount"></span>
+        </div>
+      </div>
       <div id="aiResultBox" style="display:none;margin-top:12px">
         <h3>結果 <span class="tag" id="aiDiffNote"></span></h3>
         <textarea id="aiResult" rows="12"></textarea>
         <div class="row"><button class="primary" id="btnAiApply">本文に反映する</button>
           <button class="ghost" id="btnAiDiscard">使わない</button></div>
+        <div id="aiSuggest" style="display:none"></div>
       </div>
     </div>
 
@@ -163,6 +178,18 @@
       <h3>あなたが書く場所 <span class="tag pink" id="phCount"></span></h3>
       <p class="note">ここはAIに書かせません。期間・回数・具体的な出来事を入れると、読者にとって新しい情報になります。</p>
       <div id="phList"></div>
+    </div>
+
+    <div class="card">
+      <h3>本文に入れる画像</h3>
+      <p class="note">選ぶと自動で幅1200pxに縮めて保存します。
+        <b>ご自身で撮った写真や、自作の図解</b>を入れてください。
+        フリー素材のうさぎ写真は、読者が「この人のうさぎ」と受け取ってしまうため避けます。</p>
+      <div class="row">
+        <input type="file" id="bodyImgFile" accept="image/*" multiple>
+        <span class="note" id="bodyImgNote"></span>
+      </div>
+      <div id="bodyImgList" class="list" style="margin-top:10px"></div>
     </div>
 
     <div class="card">
@@ -178,7 +205,33 @@
   <!-- ステップ3 -->
   <div class="stepbox" data-box="3" hidden>
     <div class="card">
-      <h3>公開前チェック</h3>
+      <h3>本番の見た目で確認する</h3>
+      <p class="note">公開されたときとまったく同じ見た目で表示します。
+        <b>文章を選ぶと、マーカーや太字を付けられます。</b>付けた装飾は本文に保存され、公開すると反映されます。</p>
+      <div class="row">
+        <button class="ghost" id="btnRenderPreview">読み込み直す</button>
+        <span class="sep-tools" id="markTools" style="display:none">
+          <button class="primary" id="btnMark">マーカーを引く</button>
+          <button class="ghost" id="btnUnmark">装飾を外す</button>
+        </span>
+        <button class="ghost" id="btnBoldToMark">本文の太字をすべてマーカーに</button>
+        <span class="note" id="markNote">文章をドラッグして選んでください</span>
+      </div>
+      <iframe id="previewFrame" title="記事のプレビュー"
+        style="width:100%;height:640px;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>
+    </div>
+
+    <div class="card">
+      <h3>コピペチェック</h3>
+      <p class="note">集めた口コミがそのまま本文に入っていないか、自分の別の記事と同じ言い回しになっていないかを調べます。
+        外部サイトとの照合は、確認用のフレーズを出すところまでです（理由は結果の下に書いています）。</p>
+      <div class="row"><button class="primary" id="btnCopyCheck">チェックする</button>
+        <span class="note" id="copyNote"></span></div>
+      <div id="copyResult"></div>
+    </div>
+
+    <div class="card">
+      <h3>自動チェック</h3>
       <p class="note">スタイルガイドの決まりごと、誇大表現、実体験の付け方（ステマ規制）を自動で確認します。</p>
       <div class="row"><button class="primary" id="btnCheck">チェックする</button>
         <button class="ghost" id="btnFixAll" style="display:none"></button></div>
@@ -352,7 +405,7 @@
         </select></label>
     </div>
     <label>動きの指示（プロンプト）
-      <textarea id="stPrompt" rows="3">Each character stays in its own cell and does a small cute looping motion in place (bouncing, waving, nodding). Keep the flat solid green background exactly as is. No camera movement, no zoom, characters do not overlap or leave their cells.</textarea></label>
+      <textarea id="stPrompt" rows="5">Animate this illustration sheet. Preserve the original artwork exactly: identical line art, line weight, colors, facial features and proportions. Do not redraw, restyle, or change the character design. Each rabbit stays inside its own cell and performs one clear, cute looping motion in place: bouncing, hopping, waving a paw, nodding, wiggling its ears, stretching. The motion loops smoothly back to its starting pose. Locked static camera, no zoom, no pan. Characters never overlap or leave their cells. Flat solid green background unchanged.</textarea></label>
     <div class="grid2">
       <label>長さ（秒）<select id="stDuration"><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option></select></label>
       <label>解像度<select id="stRes"><option value="768P">768P（きれい）</option><option value="480P">480P（安い・試作向け）</option></select></label>
@@ -374,13 +427,13 @@
         </select></label>
     </div>
     <div class="grid3">
-      <label>ループ込みの再生時間（秒）<select id="stTotal"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></label>
+      <label>ループ込みの再生時間（秒）<select id="stTotal"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
       <label>ループ回数<select id="stLoops"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></label>
-      <label>コマ数（5〜20）<input id="stFrames" type="number" min="5" max="20" value="15"></label>
+      <label>コマ数（5〜20）<input id="stFrames" type="number" min="5" max="20" value="20"></label>
     </div>
     <div class="grid3">
       <label>使う区間・開始（秒）<input id="stStart" type="number" min="0" step="0.1" value="0"></label>
-      <label>使う区間・終了（秒・空なら最後まで）<input id="stEnd" type="number" min="0" step="0.1" placeholder="最後まで"></label>
+      <label>使う区間・終了（秒・空なら最後まで）<input id="stEnd" type="number" min="0" step="0.1" value="2" placeholder="最後まで"></label>
       <label>背景の透過
         <select id="stKey">
           <option value="#00FF00">緑（#00FF00）を透過</option>
@@ -394,7 +447,8 @@
       <label>&nbsp;<span class="note">緑がふちに残るときは「強さ」を上げます。イラストまで消えるときは下げます。</span></label>
     </div>
     <div class="row"><button class="primary" id="btnStampCut">切り出す</button><span class="note" id="stCutState"></span></div>
-    <p class="note">1ループの長さは「再生時間 ÷ ループ回数」です。標準（3秒・2回）なら1.5秒の動きが2回流れます。
+    <p class="note">1ループの長さは「再生時間 ÷ ループ回数」です。標準（4秒・2回）なら2秒の動きが2回流れます。
+      <b>動きの速さは「使う区間の長さ」と「1ループの長さ」をそろえると実物どおりになります。</b>区間を0〜2秒にしてあるのはこのためです。区間だけ長くすると早送りになります。
       最後のコマを先頭に回してあるので、止まったときは動きの終わりのポーズで止まります。</p>
   </div>
 

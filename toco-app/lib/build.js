@@ -244,6 +244,19 @@ function buildAssets() {
       '.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}',
       // まだ書いていない記事へのリンク（読者には普通の文字として見えます）
       '.link-todo{color:inherit}',
+      // 本文中のマーカー（==テキスト== で囲んだところ）
+      [
+        '.entry-content mark.hl{',
+        'background:linear-gradient(transparent 56%, rgba(239,174,179,.5) 56%);',
+        'color:inherit;font-weight:700;padding:0 1px}',
+      ].join(''),
+      // 本文中の画像
+      [
+        '.entry-content figure.ph{margin:26px 0}',
+        '.entry-content figure.ph img{display:block;width:100%;height:auto;border-radius:12px}',
+        '.entry-content figure.ph figcaption{margin-top:8px;color:#a3968f;font-size:11px;',
+        'line-height:1.7;text-align:center}',
+      ].join(''),
       // 段落の下に出す記事カード
       [
         '.rel-cards{display:grid;gap:10px;margin:0 0 1.8em}',
@@ -342,6 +355,23 @@ function buildAssets() {
       fs.copyFileSync(path.join(prodSrc, f), path.join(prodOut, f));
       after += fs.statSync(path.join(prodOut, f)).size;
     });
+  }
+
+  // 記事本文の画像（アプリからアップロードしたもの）
+  const imgSrc = path.join(APP, 'site/assets/img');
+  if (fs.existsSync(imgSrc)) {
+    const copyDir = (from, to) => {
+      mkdir(to);
+      fs.readdirSync(from, { withFileTypes: true }).forEach((e) => {
+        const f = path.join(from, e.name);
+        const t = path.join(to, e.name);
+        if (e.isDirectory()) return copyDir(f, t);
+        if (!/\.(png|jpg|jpeg|webp)$/i.test(e.name)) return;
+        fs.copyFileSync(f, t);
+        after += fs.statSync(t).size;
+      });
+    };
+    copyDir(imgSrc, path.join(DIST, 'assets/img'));
   }
 
   // ファビコン
@@ -639,7 +669,26 @@ function build(opts) {
   };
 }
 
-module.exports = { build, parseFrontMatter, loadMarkdownDir };
+// 公開前チェックのプレビュー用。
+// 本番のビルドと同じ関数を通すので、見た目が食い違いません。
+function renderArticle(md) {
+  const settings = DB.loadSettings();
+  const byId = {};
+  products.load().forEach((p) => { byId[p.id] = p; });
+  const ctx = { products: byId, moshimo: settings.moshimo || {}, bySlug: {} };
+  loadMarkdownDir(ARTICLES, 'article').forEach((a) => { ctx.bySlug[a.slug] = a; });
+  loadMarkdownDir(PAGES, 'page').forEach((p) => {
+    ctx.bySlug[p.slug] = Object.assign({}, p, { status: 'publish' });
+  });
+  const r = markdown.render(String(md || ''), {
+    product: (id) => productCard(id, ctx),
+    ranking: (kw) => rankingLinks(kw, ctx),
+    link: makeLinkResolver(ctx),
+  });
+  return { html: r.html, toc: r.toc, headings: r.headings };
+}
+
+module.exports = { build, parseFrontMatter, loadMarkdownDir, renderArticle };
 
 if (require.main === module) {
   const r = build({ year: new Date(2026, 8, 3).getFullYear() });

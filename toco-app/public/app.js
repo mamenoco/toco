@@ -373,6 +373,7 @@ async function openProject(id, wantStep, keepHash) {
   renderPicked();
   renderReviewStep();
   renderPlaceholders();
+  renderBodyImages();
   updateChars();
   gotoStep(wantStep || ((CURRENT.article || '').length ? 2 : 1));
   show('editor', keepHash);
@@ -389,6 +390,7 @@ $('#btnDeleteProject').addEventListener('click', async () => {
 
 function gotoStep(n) {
   if (CURRENT) setHash(`edit/${CURRENT.id}/${n}`);
+  if (String(n) === '3' && CURRENT && !$('#previewFrame').srcdoc) renderPreview({});
   $$('.step').forEach((b) => b.classList.toggle('on', b.dataset.step === String(n)));
   $$('.stepbox').forEach((b) => { b.hidden = b.dataset.box !== String(n); });
   markStepsDone();
@@ -584,6 +586,48 @@ function editSpecs(idx) {
   };
 }
 
+// ---- 口コミをまとめて取得 ----
+// 1回のボタンで、未取得の商品を順番に回します。
+// サーバー側で3秒以上の間隔を空けているので、連続アクセスにはなりません。
+let FETCH_STOP = false;
+
+$('#btnFetchAll').addEventListener('click', async () => {
+  const todo = (CURRENT.products || []).filter((p) => !p.reviewText && p.url);
+  if (!todo.length) return toast('取得していない商品はありません');
+  const noUrl = (CURRENT.products || []).filter((p) => !p.url).length;
+
+  FETCH_STOP = false;
+  $('#btnFetchAll').disabled = true;
+  $('#btnFetchStop').style.display = '';
+  let done = 0, failed = 0;
+
+  for (const p of todo) {
+    if (FETCH_STOP) break;
+    $('#fetchAllNote').innerHTML =
+      `<span class="spin"></span>${done + 1} / ${todo.length}　${esc(p.name.slice(0, 26))}`;
+    try {
+      await api('reviews/fetch', { projectId: CURRENT.id, productId: p.id });
+      done++;
+    } catch (e) { failed++; }
+    const r = await api('project/get?id=' + CURRENT.id);
+    CURRENT = r.project;
+    renderReviewStep(); renderPicked();
+  }
+
+  $('#btnFetchAll').disabled = false;
+  $('#btnFetchStop').style.display = 'none';
+  $('#fetchAllNote').textContent =
+    (FETCH_STOP ? '止めました。' : '') + `${done}件を取得しました`
+    + (failed ? `／${failed}件は取得できませんでした` : '')
+    + (noUrl ? `／${noUrl}件は商品ページのURLがありません` : '');
+  if (done) toast(`口コミを${done}件ぶん取得しました`);
+});
+
+$('#btnFetchStop').addEventListener('click', () => {
+  FETCH_STOP = true;
+  $('#fetchAllNote').textContent = 'いまの1件が終わったら止めます…';
+});
+
 function renderReviewStep() {
   const list = CURRENT.products || [];
   $('#reviewList').innerHTML = list.length ? list.map((p, i) => `
@@ -657,7 +701,76 @@ $('#btnOpenPreview').addEventListener('click', async () => {
   window.open(STATE.site.previewUrl + CURRENT.slug + '/', '_blank');
 });
 
+// ---- 本文に入れる画像 ----
+async function renderBodyImages() {
+  if (!CURRENT) return;
+  let r;
+  try { r = await (await fetch('/api/image/list?id=' + encodeURIComponent(CURRENT.id))).json(); }
+  catch (e) { return; }
+  const list = r.images || [];
+  $('#bodyImgList').innerHTML = list.length ? list.map((x, i) => `
+    <div class="item">
+      <img src="${esc(x.path)}" alt="">
+      <div class="body">
+        <div class="nm">${esc(x.name)}</div>
+        <div class="mt">${x.kb}KB　<code>![説明](${esc(x.path)})</code></div>
+        <div class="acts">
+          <button class="primary" data-ins-img="${i}">本文のカーソル位置に入れる</button>
+          <button class="ghost danger" data-del-img="${i}">削除</button>
+        </div>
+      </div>
+    </div>`).join('') : '';
+
+  $('#bodyImgList').querySelectorAll('[data-ins-img]').forEach((b) => b.addEventListener('click', async () => {
+    const x = list[Number(b.dataset.insImg)];
+    const cap = prompt('画像の説明（キャプション）を入れてください。\n空のままでも構いません。', '');
+    if (cap === null) return;
+    insertAtCursor($('#articleText'), `\n\n![${cap}](${x.path})\n\n`);
+    await saveProject({ article: $('#articleText').value });
+    updateChars();
+    toast('本文に入れました');
+  }));
+  $('#bodyImgList').querySelectorAll('[data-del-img]').forEach((b) => b.addEventListener('click', async () => {
+    const x = list[Number(b.dataset.delImg)];
+    if (!confirm(x.name + ' を削除します。本文から参照していると画像が出なくなります。よろしいですか？')) return;
+    await api('image/delete', { id: CURRENT.id, name: x.name });
+    renderBodyImages();
+  }));
+}
+
+// テキストエリアのカーソル位置に差し込む
+function insertAtCursor(ta, text) {
+  const a = ta.selectionStart || 0;
+  const b = ta.selectionEnd || 0;
+  ta.value = ta.value.slice(0, a) + text + ta.value.slice(b);
+  const at = a + text.length;
+  ta.focus();
+  ta.setSelectionRange(at, at);
+}
+
+$('#bodyImgFile').addEventListener('change', async (e) => {
+  const files = [...(e.target.files || [])];
+  if (!files.length) return;
+  $('#bodyImgNote').innerHTML = '<span class="spin"></span>取り込んでいます…';
+  const done = [];
+  for (const f of files) {
+    const dataUrl = await new Promise((res) => {
+      const rd = new FileReader();
+      rd.onload = () => res(rd.result);
+      rd.readAsDataURL(f);
+    });
+    try {
+      const r = await api('image/upload', { id: CURRENT.id, dataUrl, name: f.name });
+      done.push(`${f.name} ${r.before}KB → ${r.after}KB`);
+    } catch (err) { /* エラーは toast で出ています */ }
+  }
+  e.target.value = '';
+  $('#bodyImgNote').textContent = done.length ? done.join(' / ') : '';
+  renderBodyImages();
+});
+
 let CURATED = [];
+let AI_SUGGESTED = null;
 let AI_JOB = null, AI_TIMER = null;
 
 function aiBusy(on, label) {
@@ -665,6 +778,31 @@ function aiBusy(on, label) {
   $('#btnAiWrite').disabled = on;
   $('#btnAiCancel').style.display = on ? '' : 'none';
   $('#aiStatus').innerHTML = on ? `<span class="spin"></span>${esc(label || '実行中…')}` : (label || '');
+  $('#aiProgress').style.display = on ? '' : 'none';
+  if (!on) { $('#aiBar').style.width = '0'; $('#aiBar').parentNode.classList.remove('wait'); }
+}
+
+// 進捗の表示。書き出されたファイルの大きさから、どこまで進んだかを出します。
+function aiProgress(r) {
+  const bar = $('#aiBar');
+  const m = Math.floor(r.seconds / 60), s = r.seconds % 60;
+  const time = `${m ? m + '分' : ''}${s}秒`;
+
+  if (!r.written) {
+    // まだ1文字も書かれていない＝材料を読んでいる段階
+    bar.parentNode.classList.add('wait');
+    bar.style.width = '';
+    $('#aiPhase').textContent = '材料を読み込んでいます…';
+    $('#aiCount').textContent = time;
+    return;
+  }
+  bar.parentNode.classList.remove('wait');
+  const pct = r.expected ? Math.min(96, Math.round((r.written / r.expected) * 100)) : 50;
+  bar.style.width = pct + '%';
+  $('#aiPhase').textContent = `書いています（${pct}%）`;
+  $('#aiCount').textContent = r.expected
+    ? `${r.written.toLocaleString()} / 約${r.expected.toLocaleString()}字　${time}`
+    : `${r.written.toLocaleString()}字　${time}`;
 }
 
 async function aiRun(mode) {
@@ -691,19 +829,47 @@ function aiPoll() {
     try { r = await (await fetch('/api/ai/status?jobId=' + AI_JOB)).json(); } catch (e) { return; }
 
     if (r.status === 'running') {
-      const m = Math.floor(r.seconds / 60), s = r.seconds % 60;
-      return aiBusy(true, `実行中… ${m ? m + '分' : ''}${s}秒`);
+      aiBusy(true, '実行中');
+      return aiProgress(r);
     }
     clearInterval(AI_TIMER);
     AI_JOB = null;
 
     if (r.status === 'done') {
-      aiBusy(false, '');
+      $('#aiBar').style.width = '100%';
+      $('#aiBar').parentNode.classList.remove('wait');
+      setTimeout(() => aiBusy(false, ''), 400);
+      $('#btnAiRevise').disabled = false; $('#btnAiWrite').disabled = false;
+      $('#btnAiCancel').style.display = 'none';
+      $('#aiStatus').innerHTML = '';
       $('#aiResult').value = r.article;
       $('#aiResultBox').style.display = '';
       const w = r.warnings || [];
       $('#aiDiffNote').innerHTML = w.length
         ? `<span style="color:var(--err)">${w.map(esc).join(' ')}</span>` : `${r.article.length}文字`;
+
+      // AIがタイトルや説明文の案も書いていたら、ここから公開設定に入れられるようにします
+      AI_SUGGESTED = r.suggested || null;
+      const box = $('#aiSuggest');
+      if (AI_SUGGESTED && (AI_SUGGESTED.title || AI_SUGGESTED.description)) {
+        box.style.display = '';
+        box.innerHTML = '<h3 style="margin-top:14px">AIが書いたタイトル・説明文の案</h3>'
+          + '<table class="tbl"><tbody>'
+          + (AI_SUGGESTED.title ? `<tr><td style="width:90px">タイトル</td><td class="t">${esc(AI_SUGGESTED.title)}</td></tr>` : '')
+          + (AI_SUGGESTED.description ? `<tr><td>説明文</td><td>${esc(AI_SUGGESTED.description)}</td></tr>` : '')
+          + (AI_SUGGESTED.tags ? `<tr><td>タグ</td><td>${esc(AI_SUGGESTED.tags)}</td></tr>` : '')
+          + '</tbody></table>'
+          + '<div class="row" style="margin-top:8px"><button class="ghost" id="btnUseSuggest">公開の設定に入れる</button>'
+          + '<span class="note">いまの内容は上書きされます</span></div>';
+        $('#btnUseSuggest').onclick = () => {
+          if (AI_SUGGESTED.title) { $('#pubTitle').value = AI_SUGGESTED.title; $('#eyeTitle').value = AI_SUGGESTED.title; }
+          if (AI_SUGGESTED.description) $('#pubDesc').value = AI_SUGGESTED.description;
+          if (AI_SUGGESTED.tags) $('#pubTags').value = AI_SUGGESTED.tags;
+          gotoStep(4);
+          renderPubReady();
+          toast('公開の設定に入れました。内容を確認して保存してください');
+        };
+      } else { box.style.display = 'none'; box.innerHTML = ''; }
       toast(w.length ? '注意点があります。確認してください' : 'できました。内容を確認してください');
     } else if (r.status === 'canceled') {
       aiBusy(false, '中止しました');
@@ -715,7 +881,7 @@ function aiPoll() {
         <div class="row end"><button class="primary" id="eOk">閉じる</button></div>`);
       $('#eOk').onclick = closeModal;
     }
-  }, 2000);
+  }, 1200);
 }
 
 $('#btnAiRevise').addEventListener('click', () => aiRun('revise'));
@@ -798,7 +964,188 @@ function renderPlaceholders() {
 }
 $('#articleText').addEventListener('blur', renderPlaceholders);
 
-// ---- ステップ3：チェック ----
+// ================================================================
+// ステップ3：本番の見た目で確認して、装飾を付ける
+// ================================================================
+// プレビューは iframe に本番と同じCSSを読み込んで作ります。
+// 選んだ文字を本文（Markdown）の該当箇所に結び付けて、==…== で囲みます。
+
+// opts.keepScroll … 読み込み直しても、いま見ている位置に戻します
+// opts.skipBuild  … CSSが変わらないときはビルドを省きます（装飾の付け外しなど）
+async function renderPreview(opts) {
+  const o = opts || {};
+  const f = $('#previewFrame');
+  const keep = o.keepScroll && f.contentWindow ? f.contentWindow.scrollY : 0;
+
+  await saveProject({ article: $('#articleText').value });
+  if (!o.skipBuild) await api('site/build', {});     // 最新のCSSを作る
+  const r = await api('preview-html', { id: CURRENT.id, article: $('#articleText').value });
+  const doc = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
+    <link rel="stylesheet" href="/preview.css">
+    <style>body{margin:0;background:var(--cream,#fffaf6)}
+      .wrap{max-width:820px;margin:0 auto;padding:28px 22px 60px;background:#fff}
+      ::selection{background:rgba(239,174,179,.45)}</style></head>
+    <body><div class="wrap"><div class="entry-content">${r.toc || ''}${r.html}</div></div></body></html>`;
+  f.srcdoc = doc;
+  f.onload = () => {
+    const d = f.contentDocument;
+    d.addEventListener('selectionchange', updateMarkTools);
+    d.addEventListener('mouseup', updateMarkTools);
+    d.addEventListener('keyup', updateMarkTools);
+    if (keep) {
+      // CSSと画像があとから読み込まれると文書の高さが変わり、
+      // 一度だけ戻しても位置がずれます。狙った位置に着くまで繰り返します。
+      d.documentElement.style.scrollBehavior = 'auto';   // なめらかスクロールを切る
+      const win = f.contentWindow;
+      let tries = 0;
+      const back = () => {
+        win.scrollTo(0, keep);
+        tries++;
+        const arrived = Math.abs(win.scrollY - keep) < 3;
+        const maxed = win.scrollY >= (d.documentElement.scrollHeight - win.innerHeight - 3);
+        if ((arrived || maxed) && tries > 3) return;      // 着いた（または末尾）
+        if (tries < 30) setTimeout(back, 100);            // 最長3秒
+      };
+      back();
+    }
+  };
+}
+$('#btnRenderPreview').addEventListener('click', () => renderPreview({ keepScroll: true }));
+
+function previewSelection() {
+  const f = $('#previewFrame');
+  const d = f && f.contentDocument;
+  if (!d) return null;
+  const sel = d.getSelection();
+  if (!sel || sel.isCollapsed) return null;
+  const text = sel.toString().trim();
+  if (!text || text.length < 2) return null;
+
+  // 選んだ位置が、本文の何番目の「同じ文字列」なのかを数えます。
+  // 同じ言い回しが複数あっても、狙った場所に付けられるようにするためです。
+  const range = d.createRange();
+  range.selectNodeContents(d.body);
+  range.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+  const before = range.toString();
+  let occurrence = 0;
+  let at = before.indexOf(text);
+  while (at !== -1) { occurrence++; at = before.indexOf(text, at + 1); }
+  return { text, occurrence };
+}
+
+function updateMarkTools() {
+  const s = previewSelection();
+  $('#markTools').style.display = s ? '' : 'none';
+  $('#markNote').textContent = s
+    ? `「${s.text.length > 22 ? s.text.slice(0, 22) + '…' : s.text}」を選択中`
+    : '文章をドラッグして選んでください';
+}
+
+// 本文（Markdown）の n 番目の一致箇所を置き換える
+function replaceNth(src, needle, occurrence, make) {
+  let at = -1;
+  for (let k = 0; k <= occurrence; k++) {
+    at = src.indexOf(needle, at + 1);
+    if (at === -1) return null;
+  }
+  return src.slice(0, at) + make(needle) + src.slice(at + needle.length);
+}
+
+async function applyDecoration(kind) {
+  const s = previewSelection();
+  if (!s) return toast('先に文章を選んでください');
+
+  const cur = $('#articleText').value;
+  let next = null;
+
+  if (kind === 'clear') {
+    // 囲みを外す。マーカーと太字の両方に対応します。
+    next = replaceNth(cur, '==' + s.text + '==', 0, () => s.text)
+      || replaceNth(cur, '**' + s.text + '**', 0, () => s.text);
+    if (!next) return toast('この部分には装飾が付いていないようです');
+  } else {
+    const wrap = kind === 'mark' ? '==' : '**';
+    if (cur.includes(wrap + s.text + wrap)) return toast('すでに付いています');
+    next = replaceNth(cur, s.text, s.occurrence, (t) => wrap + t + wrap);
+    if (!next) {
+      return toast('本文の中で場所を特定できませんでした。'
+        + '記号やリンクをまたいで選んでいる可能性があります。短めに選び直してください');
+    }
+  }
+
+  $('#articleText').value = next;
+  await saveProject({ article: next });
+  updateChars();
+  // いま見ている場所のまま作り直します（先頭に戻らないように）
+  await renderPreview({ keepScroll: true, skipBuild: true });
+  toast(kind === 'clear' ? '装飾を外しました' : kind === 'mark' ? 'マーカーを引きました' : '太字にしました');
+}
+
+$('#btnMark').addEventListener('click', () => applyDecoration('mark'));
+$('#btnUnmark').addEventListener('click', () => applyDecoration('clear'));
+
+// 本文中の **太字** をまとめてマーカーに変えます。
+// 行まるごとの **…**（結論の1文・ブランド名・キャッチ）は構造として使っているので触りません。
+$('#btnBoldToMark').addEventListener('click', async () => {
+  const lines = $('#articleText').value.split('\n');
+  let n = 0;
+  const next = lines.map((line) => {
+    const t = line.trim();
+    if (!t || /^\*\*[^*]+\*\*$/.test(t)) return line;   // 行まるごとの太字はそのまま
+    return line.replace(/\*\*([^*\n]+)\*\*/g, (m, inner) => { n++; return '==' + inner + '=='; });
+  }).join('\n');
+  if (!n) return toast('本文中の太字は見つかりませんでした');
+  if (!confirm(`本文中の太字 ${n}か所 をマーカーに変えます。\n` +
+    '「結論の1文」「ブランド名」「キャッチ」など、行まるごとの太字はそのままです。よろしいですか？')) return;
+  $('#articleText').value = next;
+  await saveProject({ article: next });
+  updateChars();
+  await renderPreview({ keepScroll: true, skipBuild: true });
+  toast(`${n}か所をマーカーに変えました`);
+});
+
+// ---- コピペチェック ----
+$('#btnCopyCheck').addEventListener('click', async () => {
+  $('#copyNote').innerHTML = '<span class="spin"></span>調べています…';
+  let r;
+  try { r = await api('check/similar', { id: CURRENT.id, article: $('#articleText').value }); }
+  catch (e) { $('#copyNote').textContent = ''; return; }
+  $('#copyNote').textContent = `本文 ${r.chars.toLocaleString()}文字を確認しました`;
+
+  const runList = (runs) => '<div class="list">' + runs.map((x) =>
+    `<div class="item"><div class="body"><div class="mt">${x.length}文字が一致</div>
+      <div>${esc(x.text)}</div></div></div>`).join('') + '</div>';
+
+  let html = '';
+
+  html += '<h3 style="margin-top:16px">口コミの転載</h3>';
+  html += r.reviews.length
+    ? '<p class="note" style="color:var(--err)">口コミの文がそのまま入っています。'
+      + '傾向の要約に書き直してください（そのまま載せると引用の範囲を超えます）。</p>'
+      + r.reviews.map((x) => `<div class="chkrow error"><b>${esc(x.name)}</b>${runList(x.runs)}</div>`).join('')
+    : '<p class="note" style="color:var(--ok)">一致は見つかりませんでした。'
+      + (r.reviews.length === 0 ? '（口コミを取得していない商品は対象外です）' : '') + '</p>';
+
+  html += '<h3 style="margin-top:16px">自分の別の記事との重なり</h3>';
+  html += r.internal.length
+    ? r.internal.map((x) => `<div class="chkrow warn"><b>${esc(x.title)}（${x.rate}%）</b>
+        <p>同じ言い回しが続いています。どちらかを書き直すと、記事どうしが食い合わずに済みます。</p>
+        ${runList(x.runs)}</div>`).join('')
+    : '<p class="note" style="color:var(--ok)">重なりは見つかりませんでした。</p>';
+
+  html += '<h3 style="margin-top:16px">外部サイトとの照合</h3>';
+  html += '<p class="note">ウェブ全体との照合には検索サービスの契約が必要なため、アプリの中では行えません。'
+    + '代わりに、記事の中から特徴のある文を抜き出しました。<b>完全一致で検索して、他サイトに同じ文が無いか</b>を確認してください。'
+    + 'ヒットが0件なら、その文は独自のものです。</p>';
+  html += '<div class="list">' + r.phrases.map((x) =>
+    `<div class="item"><div class="body"><div>${esc(x.text)}</div>
+      <div class="acts"><a class="mt" href="${esc(x.google)}" target="_blank" rel="noopener">完全一致で検索 ↗</a></div>
+    </div></div>`).join('') + '</div>';
+
+  $('#copyResult').innerHTML = html;
+});
+
+// ---- ステップ3：自動チェック ----
 let CHECKS = [], PREV_LABELS = null;
 
 async function runCheck() {
@@ -1627,20 +1974,33 @@ $('#btnStampCut').addEventListener('click', async (e) => {
 });
 
 let STAMP_PICKS = []; // チェックした順番 [{setId, n}]
+try { STAMP_PICKS = JSON.parse(localStorage.getItem('stampPicks') || '[]'); } catch (e) { STAMP_PICKS = []; }
+function savePicks() { try { localStorage.setItem('stampPicks', JSON.stringify(STAMP_PICKS)); } catch (e) {} }
+
+// APNG はページを開いたときに指定回数だけ再生して止まるので、読み直して動かす
+function replayStamp(img) {
+  const base = img.src.split('?')[0];
+  img.src = base + '?t=' + Date.now();
+}
 
 async function renderStamps() {
-  const { sets, zips, maxBytes } = await api('stamp/list');
+  const [{ sets, zips }, { videos }] = await Promise.all([api('stamp/list'), api('video/list')]);
   STAMP_PICKS = STAMP_PICKS.filter((p) => sets.some((s) => s.id === p.setId));
+  savePicks();
+  const videoOf = (s) => videos.find((v) => v.id + '.mp4' === s.video);
+  const totalStamps = sets.reduce((n, s) => n + s.stamps.length, 0);
   $('#stZips').innerHTML = zips.length
     ? '<p class="note">作った zip：' + zips.slice(0, 5).map((z) =>
       `<a href="/stamps/zips/${encodeURIComponent(z.file)}" download>${esc(z.file)}</a>（${Math.round(z.bytes / 1024)} KB）`).join(' ／ ') + '</p>'
     : '';
-  $('#stSets').innerHTML = sets.length ? sets.map((s) => `
+  $('#stSets').innerHTML = sets.length ? `<p class="note">スタンプは全部で ${totalStamps} 個（${sets.length} セット）。動画を追加して切り出すと、ここに増えていきます。</p>` + sets.map((s) => `
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line2)">
       <div class="row" style="justify-content:space-between">
         <div><b>${esc(s.createdAt.slice(0, 16).replace('T', ' '))}</b>
+          <span class="note">元動画：${esc((videoOf(s) || {}).prompt || s.video).slice(0, 40)}</span><br>
           <span class="note">横${s.cols}×縦${s.rows} ／ ${s.total}秒・${s.loops}回ループ・${s.frames}コマ ／ 区間 ${s.start}〜${s.end}秒${s.keyColor ? ' ／ 透過 ' + esc(s.keyColor) : ''}</span></div>
-        <div class="row"><button class="ghost" data-pick-all="${s.id}">全部えらぶ</button>
+        <div class="row"><button class="ghost" data-play-set="${s.id}">▶ 全部再生</button>
+          <button class="ghost" data-pick-all="${s.id}">全部えらぶ</button>
           <button class="ghost" data-del-set="${s.id}">削除</button></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:10px">
@@ -1651,18 +2011,34 @@ async function renderStamps() {
             <div style="display:flex;justify-content:space-between;align-items:center">
               <input type="checkbox" data-pick="${s.id}:${st.n}" ${picked >= 0 ? 'checked' : ''}>
               <span class="tag ${st.over ? 'err' : 'ok'}">${picked >= 0 ? (picked + 1) + '番 ／ ' : ''}${Math.round(st.bytes / 1024)} KB</span></div>
-            <img src="/stamps/${s.id}/${st.file}?t=${s.id}" style="width:100%;height:120px;object-fit:contain;display:block;margin:6px 0">
-            <div class="note" style="margin:0;text-align:center">${st.n}：${st.width}×${st.height}・${st.frames}コマ${st.over ? '・容量オーバー' : ''}</div>
+            <img src="/stamps/${s.id}/${st.file}?t=${s.id}" data-stamp-img style="width:100%;height:120px;object-fit:contain;display:block;margin:6px 0" title="クリックで再生">
+            <div class="row" style="justify-content:space-between">
+              <span class="note" style="margin:0">${st.n}：${st.width}×${st.height}・${st.frames}コマ${st.over ? '・容量オーバー' : ''}</span>
+              <button class="ghost" data-play style="padding:2px 8px;font-size:11px">▶ 再生</button></div>
           </label>`;
         }).join('')}
       </div>
     </div>`).join('') : '<p class="note">まだスタンプはありません。②で動画から切り出してください。</p>';
 
+  $$('#stSets [data-play]').forEach((b) => b.addEventListener('click', (e) => {
+    e.preventDefault();
+    replayStamp(b.closest('label').querySelector('[data-stamp-img]'));
+  }));
+  $$('#stSets [data-stamp-img]').forEach((img) => img.addEventListener('click', (e) => {
+    e.preventDefault();   // 画像クリックはチェックを切り替えず、再生だけする
+    replayStamp(img);
+  }));
+  $$('#stSets [data-play-set]').forEach((b) => b.addEventListener('click', () => {
+    const t = Date.now();
+    $$('#stSets [data-stamp-img]').filter((img) => img.src.includes('/stamps/' + b.dataset.playSet + '/'))
+      .forEach((img) => { img.src = img.src.split('?')[0] + '?t=' + t; });
+  }));
   $$('#stSets [data-pick]').forEach((cb) => cb.addEventListener('change', () => {
     const [setId, n] = cb.dataset.pick.split(':');
     const pick = { setId, n: Number(n) };
     if (cb.checked) STAMP_PICKS.push(pick);
     else STAMP_PICKS = STAMP_PICKS.filter((p) => !(p.setId === setId && p.n === pick.n));
+    savePicks();
     renderStamps();
   }));
   $$('#stSets [data-pick-all]').forEach((b) => b.addEventListener('click', () => {

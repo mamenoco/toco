@@ -35,6 +35,7 @@ const affiliate = require('./lib/affiliate.js');
 const products = require('./lib/products.js');
 const curate = require('./lib/curate.js');
 const links = require('./lib/links.js');
+const similarity = require('./lib/similarity.js');
 const preview = require('./lib/preview-server.js');
 const fal = require('./lib/fal.js');
 const stamps = require('./lib/stamps.js');
@@ -145,6 +146,13 @@ const server = http.createServer(async (req, res) => {
   const p = u.pathname;
 
   if (!p.startsWith('/api/')) {
+    // 公開前チェックのプレビューで、本番と同じ見た目にするためのCSS
+    if (p === "/preview.css") {
+      const css = path.join(ROOT, "dist", "assets", "css", "site.css");
+      if (!fs.existsSync(css)) return send(res, 404, "/* まだビルドされていません */", MIME[".css"]);
+      return send(res, 200, fs.readFileSync(css), MIME[".css"]);
+    }
+
     // /assets/ は site/assets/（商品画像・アイキャッチ・ファビコン）から配ります。
     // 画面で商品画像を表示するために必要です。
     if (p.startsWith('/assets/')) {
@@ -543,6 +551,8 @@ const server = http.createServer(async (req, res) => {
       const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current);
       const jobId = DB.newId();
       claude.startClaude(jobId, prompt, settings.aiModel, {
+        // 進捗の目安。書き直しは元の長さ、新規は記事1本ぶんの目安を使います。
+        expected: body.mode === 'revise' ? (current.length || 8000) : 10000,
         workFile: claude.workPaths(pr).article,
         baseText: body.mode === 'revise' ? current : '',
         baseLength: current.length,
@@ -554,11 +564,18 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/ai/status') {
       const job = claude.JOBS[u.searchParams.get('jobId')];
       if (!job) return send(res, 200, { error: '実行が見つかりません' });
+      // 書き出し中のファイルの大きさから、どのくらい進んだかを見ます。
+      // 日本語はUTF-8で1文字およそ3バイトなので、そこから文字数を見積もります。
+      let written = 0;
+      try { written = Math.round(fs.statSync(job.workFile).size / 3); } catch (e) {}
       return send(res, 200, {
         status: job.status,
         seconds: Math.round((Date.now() - job.startedAt) / 1000),
+        written,
+        expected: job.expected || 0,
         article: job.article || '',
         warnings: job.warnings || [],
+        suggested: job.suggested || null,
         error: job.status === 'error' ? job.error.slice(-1600) : '',
       });
     }
@@ -567,9 +584,15 @@ const server = http.createServer(async (req, res) => {
       const jobId = DB.newId();
       const pingFile = path.join(ROOT, 'data', 'ping.txt');
       fs.mkdirSync(path.dirname(pingFile), { recursive: true });
-      fs.writeFileSync(pingFile, '', 'utf8');
-      claude.startClaude(jobId, `${pingFile} というファイルに「OK」とだけ書いて保存してください。`,
-        settings.aiModel, { workFile: pingFile });
+      // 日本語で書かせて、文字コードまで含めて確かめます。
+      // 空のファイルだと Write ツールを使われるので、目印を1行入れておきます。
+      fs.writeFileSync(pingFile, '（ここを書き換えます）\n', 'utf8');
+      claude.startClaude(jobId, [
+        `${pingFile} には「（ここを書き換えます）」という1行だけが入っています。`,
+        'Edit ツールで、その1行を「動作確認できました」に置き換えてください。',
+        'Write ツールは使わないでください。',
+        '終わったら「完了」とだけ答えてください。',
+      ].join('\n'), settings.aiModel, { workFile: pingFile });
       return send(res, 200, { ok: true, jobId });
     }
 
@@ -669,12 +692,138 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { results: runChecks(text, pr, db.inventory) });
     }
 
+    // ===== コピペチェック =====
+    // ・集めた口コミの文が、そのまま本文に入っていないか
+    // ・自分の別の記事と同じ言い回しになっていないか
+    // ・外部サイトとの照合は検索が要るので、確認用のフレーズを出すところまで
+    if (p === '/api/check/similar') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr) return send(res, 200, { error: '記事が見つかりません' });
+      const text = body.article != null ? body.article : bodyOf(pr);
+      if (!text.trim()) return send(res, 200, { error: '先に本文を書いてください' });
+
+      // 1. 口コミの転載
+      const reviews = [];
+      (pr.products || []).forEach((prod) => {
+        if (!prod.reviewText) return;
+        const runs = similarity.commonRuns(text, prod.reviewText, { gram: 16, min: 22 });
+        if (runs.length) reviews.push({ name: prod.name, runs: runs.slice(0, 5) });
+      });
+
+      // 2. 自分の別の記事との重なり
+      const internal = [];
+      articles.list().forEach((a2) => {
+        if (a2.slug === pr.slug) return;
+        const other = articles.read(a2.slug);
+        if (!other || !other.body.trim()) return;
+        const runs = similarity.commonRuns(text, other.body, { gram: 20, min: 30 });
+        if (runs.length) {
+          internal.push({
+            slug: a2.slug, title: a2.title,
+            rate: Math.round(similarity.overlapRate(text, other.body, { gram: 20, min: 30 }) * 100),
+            runs: runs.slice(0, 5),
+          });
+        }
+      });
+
+      // 3. 外部照合用のフレーズ
+      const phrases = similarity.searchPhrases(text, 6).map((q) => ({
+        text: q,
+        google: 'https://www.google.com/search?q=' + encodeURIComponent('"' + q + '"'),
+      }));
+
+      return send(res, 200, { reviews, internal, phrases, chars: text.length });
+    }
+
     // ===== プレビュー用のHTML（1記事だけ） =====
+    // 商品カードや関連記事カードも含め、本番とまったく同じ描画にします。
     if (p === '/api/preview-html') {
       const pr = db.projects.find((x) => x.id === (body.id || u.searchParams.get('id')));
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
-      const r = markdown.render(body.article != null ? body.article : bodyOf(pr));
-      return send(res, 200, { html: r.html, toc: r.toc, headings: r.headings });
+      const md = body.article != null ? body.article : bodyOf(pr);
+      // 目次は本文の最初の見出しの直前に入るので、プレビューでも同じ位置にします
+      const r = builder.renderArticle(md);
+      let html = r.html;
+      if (r.toc) {
+        const at = html.indexOf('<h2');
+        html = at === -1 ? r.toc + html : html.slice(0, at) + r.toc + html.slice(at);
+      }
+      return send(res, 200, { html, toc: '', headings: r.headings });
+    }
+
+    // ===== 本文に入れる画像 =====
+    // 大きな写真をそのまま置くとページが重くなるので、
+    // 受け取った時点で幅1200pxに縮めて保存します。
+    if (p === '/api/image/upload') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '先にURL（スラッグ）を決めてください' });
+      const m = String(body.dataUrl || '').match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
+      if (!m) return send(res, 200, { error: '画像を読み取れませんでした' });
+      const buf = Buffer.from(m[2], 'base64');
+      if (buf.length > 20 * 1024 * 1024) return send(res, 200, { error: '画像が大きすぎます（20MBまで）' });
+
+      const dir = path.join(ROOT, 'site', 'assets', 'img', pr.slug);
+      fs.mkdirSync(dir, { recursive: true });
+      const ext = m[1] === 'png' ? 'png' : 'jpg';
+      const base = String(body.name || 'photo').toLowerCase()
+        .replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'photo';
+      let name = `${base}.${ext}`;
+      for (let n = 2; fs.existsSync(path.join(dir, name)); n++) name = `${base}-${n}.${ext}`;
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, buf);
+
+      const before = buf.length;
+      let width = 0, height = 0;
+      let out = file;
+      let outName = name;
+      try {
+        // 写真をPNGのまま置くと数MBになります。透過が要らないものはJPEGに変換します。
+        let toJpeg = ext !== 'png';
+        if (ext === 'png') {
+          const alpha = execSync(`sips -g hasAlpha "${file}"`, { encoding: 'utf8' });
+          toJpeg = /hasAlpha:\s*no/.test(alpha);
+        }
+        if (toJpeg && ext === 'png') {
+          outName = name.replace(/\.png$/, '.jpg');
+          out = path.join(dir, outName);
+        }
+        execSync(`sips -Z 1200${toJpeg ? ' -s format jpeg -s formatOptions 82' : ''}`
+          + ` "${file}" --out "${out}"`, { stdio: 'ignore' });
+        if (out !== file) fs.unlinkSync(file);
+        const info = execSync(`sips -g pixelWidth -g pixelHeight "${out}"`, { encoding: 'utf8' });
+        width = Number((info.match(/pixelWidth:\s*(\d+)/) || [])[1] || 0);
+        height = Number((info.match(/pixelHeight:\s*(\d+)/) || [])[1] || 0);
+      } catch (e) { out = file; outName = name; }
+
+      const after = fs.statSync(out).size;
+      const rel = `/assets/img/${pr.slug}/${outName}`;
+      return send(res, 200, {
+        ok: true, path: rel, width, height,
+        before: Math.round(before / 1024), after: Math.round(after / 1024),
+        markdown: `![](${rel}${width ? ` ${width}x${height}` : ''})`,
+      });
+    }
+
+    // 記事に入っている画像の一覧
+    if (p === '/api/image/list') {
+      const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
+      if (!pr || !pr.slug) return send(res, 200, { images: [] });
+      const dir = path.join(ROOT, 'site', 'assets', 'img', pr.slug);
+      if (!fs.existsSync(dir)) return send(res, 200, { images: [] });
+      return send(res, 200, {
+        images: fs.readdirSync(dir).filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f)).map((f) => ({
+          name: f, path: `/assets/img/${pr.slug}/${f}`,
+          kb: Math.round(fs.statSync(path.join(dir, f)).size / 1024),
+        })),
+      });
+    }
+
+    if (p === '/api/image/delete') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '記事が見つかりません' });
+      const file = path.join(ROOT, 'site', 'assets', 'img', pr.slug, path.basename(String(body.name || '')));
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+      return send(res, 200, { ok: true });
     }
 
     // ===== アイキャッチの保存 =====

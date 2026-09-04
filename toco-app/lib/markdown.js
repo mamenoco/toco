@@ -33,6 +33,8 @@ function inline(t) {
       return (r && r.html) || l;
     })
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    // ==テキスト== でマーカー。本文中の目立たせたい一文に使います。
+    .replace(/==([^=\n]+)==/g, '<mark class="hl">$1</mark>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
@@ -116,6 +118,18 @@ function render(md, opts) {
     // 単体のアンカーは覚えておき、次の見出しの id にする
     const am = line.match(/^<a id="([^"]+)"><\/a>$/);
     if (am) { pendingAnchor = am[1]; i++; continue; }
+
+    // 画像。単独の行に ![キャプション](パス) と書きます。
+    // キャプションは figcaption と alt の両方に使います。
+    const im = line.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+(\d+)x(\d+))?\)$/);
+    if (im) {
+      const cap = im[1].trim();
+      const size = im[3] ? ` width="${im[3]}" height="${im[4]}"` : '';
+      push('<figure class="ph"><img src="' + esc(im[2]) + '" alt="' + esc(cap) + '"'
+        + size + ' loading="lazy" decoding="async">'
+        + (cap ? '<figcaption>' + esc(cap) + '</figcaption>' : '') + '</figure>');
+      i++; continue;
+    }
 
     // 商品カード
     const pm = line.match(/^\{\{product:([A-Za-z0-9_-]+)\}\}$/);
@@ -258,7 +272,7 @@ function render(md, opts) {
     const start = i;
     const buf = [];
     while (i < lines.length && lines[i].trim()
-      && !/^([#>|]|[-*]\s|\d+\.\s|<[a-zA-Z!/]|\{\{)/.test(lines[i].trim())
+      && !/^([#>|]|[-*]\s|\d+\.\s|<[a-zA-Z!/]|\{\{|!\[)/.test(lines[i].trim())
       && !/^(-{3,}|\*{3,}|_{3,})$/.test(lines[i].trim())) {
       buf.push(lines[i].trim());
       i++;

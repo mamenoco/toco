@@ -35,6 +35,38 @@ const WORDING = [
   ['沢山', 'たくさん'],
 ];
 
+// 報告書のように見える言い回し。ペットショップの店員の話し方から遠ざかります。
+const REPORTY = [
+  ['という報告', '「〜ということもあるようです」「〜という声もあります」'],
+  ['との報告', '「〜という声が目立ちます」'],
+  ['報告があ', '「〜という声があります」'],
+  ['指摘があ', '「〜が気になるという方もいます」'],
+  ['事例が', '「〜ということが起こります」'],
+  ['傾向として', '「〜が多いです」'],
+  ['ユーザーは', '「使っている方は」'],
+  ['ユーザーが', '「使っている方が」'],
+  ['見受けられ', '「〜が多いです」'],
+  ['散見され', '「〜という声もあります」'],
+];
+
+// 商品ブロック以外では使わない語（情報源の明示が要るのは商品ブロックだけ）
+const SOURCE_WORDS = ['口コミ', 'レビュー', 'クチコミ'];
+
+// 本文を「商品ブロック」とそれ以外に分ける。
+// 「おすすめ○選」の h2 から、次の h2 までを商品ブロックとみなします。
+function splitByProductSection(text) {
+  const lines = String(text).split('\n');
+  const inside = [];
+  const outside = [];
+  let inProduct = false;
+  lines.forEach((line, i) => {
+    const h2 = line.match(/^##\s+(.+)$/);
+    if (h2) inProduct = /おすすめ.*選/.test(h2[1]);
+    (inProduct ? inside : outside).push({ line, no: i + 1 });
+  });
+  return { inside, outside };
+}
+
 // どちらを使ってもよいが、記事の中で混ざってはいけない語
 const MIXED = [
   ['うんち', 'フン'],
@@ -94,6 +126,87 @@ function runChecks(article, project, inventory) {
     add('warn', `本文に価格が書かれています（${realPrice.length}か所）`,
       `${realPrice.slice(0, 5).join(' / ')} … 価格はポチップに任せる方針です。`,
       '本文に書かれている具体的な金額を、金額を出さない表現に書き換えてください（例：「6,000円台から」→「安いものでは」）。スペック表と商品名は変更しないでください。');
+  }
+
+  // 報告書のような言い回し
+  REPORTY.forEach(([word, better]) => {
+    const n = (text.match(new RegExp(word, 'g')) || []).length;
+    if (!n) return;
+    add('warn', `報告書のような言い回し「${word}」（${n}か所）`,
+      `ペットショップの店員が話しているような文章にします。${better} のように書き換えてください。`,
+      `本文の「${word}」を含む文を、${better} のような話し言葉に書き換えてください。`
+      + '意味は変えず、同じ言い換えを繰り返さないでください。ほかの箇所は変更しないでください。');
+  });
+
+  // 本文中の太字（行まるごとの ** は構造として使うので対象外）
+  {
+    const inlineBold = [];
+    String(text).split('\n').forEach((line) => {
+      const t = line.trim();
+      if (!t || /^\*\*[^*]+\*\*$/.test(t)) return;   // 結論の1文・ブランド名・キャッチ
+      const m = t.match(/\*\*[^*\n]+\*\*/g);
+      if (m) inlineBold.push(...m);
+    });
+    if (inlineBold.length) {
+      add('warn', `本文中に太字があります（${inlineBold.length}か所）`,
+        '本文の強調は、太字ではなくマーカー（==テキスト==）を使う方針です。'
+        + `　例：${inlineBold.slice(0, 3).join(' / ')}`
+        + '　公開前チェックの「本文の太字をすべてマーカーに」で一括変換できます。',
+        '本文の途中にある **強調** を、==強調== の形（マーカー）に書き換えてください。'
+        + 'ただし、行まるごとが **…** になっているもの（結論の1文・ブランド名・キャッチ）は変更しないでください。');
+    }
+  }
+
+  // 「口コミ」「レビュー」は商品ブロックの中だけ
+  {
+    const { outside } = splitByProductSection(text);
+    const hits = [];
+    outside.forEach(({ line, no }) => {
+      const t = line.trim();
+      // 見出しと、出典を断る引用ブロックは対象外。
+      // 「この記事で紹介している口コミは〜」の注記はスタイルガイドで必須のため。
+      if (/^#/.test(t) || /^>/.test(t)) return;
+      SOURCE_WORDS.forEach((w) => {
+        if (t.includes(w)) hits.push({ w, no, line: t });
+      });
+    });
+    if (hits.length) {
+      add('warn', `商品ブロック以外に「口コミ」が出ています（${hits.length}か所）`,
+        '情報源を明示するのは商品ブロックだけにします。ほかの本文では「〜という声」にとどめてください。'
+        + `　例：${hits[0].line.slice(0, 40)}`,
+        'つぎの方針で書き換えてください。「おすすめ○選」の各商品ブロックの中では「口コミでは〜」のままでよい。'
+        + 'それ以外の本文（導入・選び方・よくある質問・まとめ）にある「口コミ」「レビュー」という語は、'
+        + '「〜という声が多いです」のように言い換え、出典を名乗らない書き方にしてください。ほかの箇所は変更しないでください。',
+        { step: 4, find: hits[0].line.slice(0, 30) });
+    }
+  }
+
+  // 「声」の出しすぎ（セクションごとに数える）
+  {
+    const count = (t) => (t.match(/という声|との声|声が多い|声もあり/g) || []).length;
+    const noisy = [];
+    String(text).split(/^##\s+/m).slice(1).forEach((sec) => {
+      const title = sec.split('\n')[0].trim();
+      if (/おすすめ.*選/.test(title)) {
+        // 商品ブロックは商品ごとに1つの塊なので、h3 単位で数えます
+        sec.split(/^###\s+/m).slice(1).forEach((block) => {
+          const name = block.split('\n')[0].trim();
+          const n = count(block);
+          if (n >= 3) noisy.push({ title: name, n });
+        });
+        return;
+      }
+      const n = count(sec);
+      if (n >= 3) noisy.push({ title, n });
+    });
+    if (noisy.length) {
+      add('warn', `「声」の話が続いています（${noisy.map((x) => x.title.slice(0, 14) + `：${x.n}回`).join(' / ')}）`,
+        '同じセクションで3回以上続くと、報告書のような印象に戻ります。'
+        + '声を根拠に置いたら、次の文は自分の言葉で言い切ってください。',
+        `「${noisy[0].title}」のセクションで「〜という声」の形が${noisy[0].n}回出ています。`
+        + '2回までに減らし、残りは「迷ったら大きいほうを選んでおくと安心です」のように、'
+        + '自分の言葉で言い切る文に書き換えてください。ほかのセクションは変更しないでください。');
+    }
   }
 
   // 体験の記述と持ちもの台帳の整合（ステマ規制）
