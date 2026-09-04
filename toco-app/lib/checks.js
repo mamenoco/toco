@@ -37,6 +37,8 @@ const WORDING = [
 
 // 報告書のように見える言い回し。ペットショップの店員の話し方から遠ざかります。
 const REPORTY = [
+  ['報告', '「〜ということもあるようです」「〜という声もあります」'],
+  ['投稿', '「〜という方もいます」「〜ということも起こります」'],
   ['という報告', '「〜ということもあるようです」「〜という声もあります」'],
   ['との報告', '「〜という声が目立ちます」'],
   ['報告があ', '「〜という声があります」'],
@@ -153,8 +155,82 @@ function runChecks(article, project, inventory) {
   }
 
   // 報告書のような言い回し
-  REPORTY.forEach(([word, better]) => {
-    const n = (text.match(new RegExp(word, 'g')) || []).length;
+  // 「という報告」と「報告」のように重なる語があるので、長いほうから数えて二重計上を防ぎます。
+  {
+    let rest = String(text);
+    REPORTY.slice().sort((a, b) => b[0].length - a[0].length).forEach(([word, better]) => {
+      const n = (rest.match(new RegExp(word, 'g')) || []).length;
+      if (!n) return;
+      rest = rest.split(word).join('');
+      add('warn', `報告書のような言い回し「${word}」（${n}か所）`,
+        `ペットショップの店員が話しているような文章にします。${better} のように書き換えてください。`,
+        `本文の「${word}」を含む文を、${better} のような話し言葉に書き換えてください。`
+        + '意味は変えず、同じ言い換えを繰り返さないでください。ほかの箇所は変更しないでください。');
+    });
+  }
+
+  // カギ括弧は商品ブロックの中だけ
+  {
+    const { outside } = splitByProductSection(text);
+    const prose = [];
+    let structural = 0;
+    outside.forEach(({ line }) => {
+      const t = line.trim();
+      if (!t || !/[「」]/.test(t)) return;
+      // 見出し・表・引用は文章ではないので分けて数えます
+      if (/^[#>|]/.test(t)) { structural += (t.match(/「/g) || []).length; return; }
+      (t.match(/「[^」]{1,40}」/g) || []).forEach((q) => prose.push(q));
+    });
+
+    // カギ括弧には2種類あります。
+    //   ・声の引用   「最初からMにしておけばよかった」← 直したい
+    //   ・語の強調   「幅」「新刈り」「どんな子に合うか」← 残してよい
+    // 文の形をしていて、末尾が「か」でないものを引用とみなします。
+    const quotes = prose.filter((q) => {
+      const inner = q.slice(1, -1);
+      return inner.length >= 6 && !/か$/.test(inner);
+    });
+    const terms = prose.length - quotes.length;
+
+    if (quotes.length) {
+      add('warn', `商品ブロック以外に声の引用があります（${quotes.length}か所${terms ? `／語の強調は ${terms}か所で対象外` : ''}）`,
+        '読者の声をカギ括弧で引くと、資料を読み上げている調子になります。地の文で書いてください。'
+        + `　例：${quotes.slice(0, 3).join(' ')}`,
+        '「おすすめ○選」の商品ブロック以外にあるカギ括弧「」を外し、地の文に直してください。'
+        + '例：「最初からMにしておけばよかった」という声が多いです → '
+        + '最初から大きいほうにしておけばよかった、という方が多いですよ。'
+        + '「幅」「新刈り」のような短い語の強調と、見出し・表の中のカギ括弧は、そのままにしてください。');
+    }
+  }
+
+  // 文末が同じ形で続いていないか
+  {
+    const paras = String(text).split(/\n\s*\n/);
+    const runs = [];
+    paras.forEach((para) => {
+      const t = para.trim();
+      if (!t || /^[#>|\-*!]/.test(t) || /^\{\{/.test(t)) return;
+      const ends = t.split(/。/).map((x) => x.trim()).filter(Boolean)
+        .map((x) => (x.match(/(です|ます|ました|ません|でしょう)$/) || [''])[0]).filter(Boolean);
+      let run = 1;
+      for (let i = 1; i < ends.length; i++) {
+        if (ends[i] === ends[i - 1]) { run++; } else { run = 1; }
+        if (run >= 3) { runs.push({ end: ends[i], para: t.slice(0, 46) }); break; }
+      }
+    });
+    if (runs.length) {
+      add('warn', `同じ文末が3回以上続いています（${runs.length}か所）`,
+        `「〜${runs[0].end}。」が並ぶと単調に読めます。2回続いたら3回目で形を変えてください。`
+        + '「〜ですよ」「〜ますね」「体言止め」などが使えます。'
+        + `　例：${runs[0].para}…`,
+        '本文で同じ文末（です／ます）が3回以上続いている段落を探し、'
+        + '3文目の語尾を「〜ですよ」「〜ますね」「体言止め」などに変えてください。'
+        + '意味は変えず、1段落につき1か所だけ変えてください。ほかの箇所は変更しないでください。');
+    }
+  }
+
+  if (false) REPORTY.forEach(([word, better]) => {
+    const n = 0;
     if (!n) return;
     add('warn', `報告書のような言い回し「${word}」（${n}か所）`,
       `ペットショップの店員が話しているような文章にします。${better} のように書き換えてください。`,
