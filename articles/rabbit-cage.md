@@ -128,8 +128,6 @@ status: publish
 
 ### クリアフロント80 ｜ わが家で使っています
 
-**GEX（ジェックス）**
-
 {{product:clearfront}}
 
 **前面がアクリルで中の様子がよく見える80cm**
@@ -155,8 +153,6 @@ status: publish
 
 ### イージーホーム・エボ80 WH
 
-**三晃商会（サンコー）**
-
 {{product:evo80}}
 
 **幅81cmで足を伸ばして眠れる定番モデル**
@@ -179,8 +175,6 @@ status: publish
 <a id="next70"></a>
 
 ### イージーホーム ネクスト70 ラビット ホワイト
-
-**三晃商会（サンコー）**
 
 {{product:next70}}
 
@@ -205,8 +199,6 @@ status: publish
 
 ### クリアケージ M
 
-**マルカン（ミニマルランド）**
-
 {{product:clearm}}
 
 **幅82cmとロフト付きで価格を抑えたモデル**
@@ -229,8 +221,6 @@ status: publish
 <a id="wideb"></a>
 
 ### うさぎのカンタンおそうじケージ ワイドB
-
-**マルカン（ミニマルランド）**
 
 {{product:wideb}}
 
@@ -255,8 +245,6 @@ status: publish
 
 ### ラビんぐ スマートルーム
 
-**GEX（ジェックス）**
-
 {{product:smartroom}}
 
 **トイレと床の段差が少ないフラットフロア**
@@ -279,8 +267,6 @@ status: publish
 <a id="livingl"></a>
 
 ### うさぎが上手に飼えるリビングルーム L
-
-**マルカン（ミニマルランド）**
 
 {{product:livingl}}
 

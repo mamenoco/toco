@@ -267,14 +267,13 @@ function render(md, opts) {
     }
 
     // 太字だけの行
-    //   「おすすめ○選」の中：1つ目はブランド名、2つ目はキャッチ
+    //   「おすすめ○選」の中：商品の一文キャッチ
     //   それ以外（選び方など）：そのセクションの結論をあらわす1文
+    // ※ メーカー名は商品カードに出るので、本文には書きません。
     const bm = line.match(BOLD_ONLY);
     if (bm) {
       boldSinceHeading++;
-      if (!inProductSection) para(inline(bm[1]), 'lead');
-      else if (boldSinceHeading === 1) para(`<strong>${inline(bm[1])}</strong>`, 'brand');
-      else para(inline(bm[1]), 'catch');
+      para(inline(bm[1]), inProductSection ? 'catch' : 'lead');
       i++; continue;
     }
 

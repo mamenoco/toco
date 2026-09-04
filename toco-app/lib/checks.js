@@ -257,6 +257,28 @@ function runChecks(article, project, inventory) {
     }
   }
 
+  // 商品ブロックのメーカー名（商品カードと重複するので不要）
+  {
+    const lines = String(text).split('\n');
+    let inProd = false; let hit = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      const h2 = t.match(/^##\s+(.+)$/);
+      if (h2) { inProd = /おすすめ.*選/.test(h2[1]); continue; }
+      if (!inProd || !/^###\s/.test(t)) continue;
+      let j = i + 1; while (j < lines.length && !lines[j].trim()) j++;
+      let k = j + 1; while (k < lines.length && !lines[k].trim()) k++;
+      if (j < lines.length && /^\*\*[^*]+\*\*$/.test(lines[j].trim())
+        && k < lines.length && /^\{\{product:/.test(lines[k].trim())) hit++;
+    }
+    if (hit) {
+      add('warn', `商品ブロックにメーカー名の行があります（${hit}か所）`,
+        'メーカー名は商品カードに出るので、本文に書くと二重になります。',
+        '「おすすめ○選」の各商品ブロックで、見出しの直後にありカードの記法の直前にある'
+        + '太字1行（メーカー名）を、空行ごと削除してください。ほかの箇所は変更しないでください。');
+    }
+  }
+
   // 「口コミ」「レビュー」は商品ブロックの中だけ
   {
     const { outside } = splitByProductSection(text);
