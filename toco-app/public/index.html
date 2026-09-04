@@ -103,6 +103,12 @@
         口コミ数・評価・価格帯のばらつきから10点前後に絞ります。そこから6〜7点を選んでください。</p>
       <div class="inline">
         <label>キーワード<input id="searchKeyword" placeholder="うさぎ 牧草"></label>
+        <label>除外キーワード（空白区切り）
+          <input id="searchNg" placeholder="砂 シーツ マット 消臭"></label>
+      </div>
+      <p class="note">用品ばかり出て本体が出てこないときは、除外キーワードを入れてください。
+        例：「うさぎ トイレ」で砂やシーツが並ぶなら <code>砂 シーツ マット 消臭</code> を除外します。</p>
+      <div class="row">
         <button class="primary" id="btnCurate">候補を自動で選ぶ</button>
         <button class="ghost" id="btnSearch">ふつうに検索</button>
         <button class="ghost" id="btnManualAdd">手入力で追加</button>
@@ -270,6 +276,27 @@
         <span class="note" id="eyeSaved"></span>
       </div>
       <canvas id="eyeCanvas" width="1200" height="630" hidden></canvas>
+
+      <div id="eyeGenBox" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
+        <h3 style="margin:0 0 4px">AIで作る</h3>
+        <p class="note"><b>日本語で書けます。</b>送るときに画像生成向けの英語へ自動で直します。
+          <b>うさぎそのものは描かせないでください。</b>
+          実在しないうさぎを実写のように見せると、実体験で書いているこのサイトでは誤解を招きます。
+          牧草・ケージ・食器・部屋の様子など、<b>ものや場所</b>を描くのが向いています。</p>
+        <div class="row">
+          <button class="ghost" data-tpl="items">商品まわり</button>
+          <button class="ghost" data-tpl="hay">牧草・ごはん</button>
+          <button class="ghost" data-tpl="room">うさぎのいる部屋（うさぎは描かない）</button>
+        </div>
+        <label>どんな絵にしますか
+          <textarea id="eyePrompt" rows="3"
+            placeholder="木の床に置かれた白い陶器のボウルに入った乾燥牧草と、そばに置かれた小さなかご"></textarea></label>
+        <div class="inline">
+          <label>モデル<select id="eyeModel"></select></label>
+          <button class="primary" id="btnEyeGen">この内容で作る</button>
+        </div>
+        <p class="note" id="eyeGenNote"></p>
+      </div>
     </div>
 
     <div class="card">

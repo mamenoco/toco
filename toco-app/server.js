@@ -36,6 +36,8 @@ const products = require('./lib/products.js');
 const curate = require('./lib/curate.js');
 const links = require('./lib/links.js');
 const similarity = require('./lib/similarity.js');
+const imageAI = require('./lib/image-ai.js');
+const translate = require('./lib/translate.js');
 const preview = require('./lib/preview-server.js');
 const fal = require('./lib/fal.js');
 const stamps = require('./lib/stamps.js');
@@ -523,10 +525,11 @@ const server = http.createServer(async (req, res) => {
       if (!keyword) return send(res, 200, { error: 'キーワードを入れてください' });
 
       // 1ページ30件が上限なので、2ページ取って母数を増やします
+      const opts = { ng: String(body.ng || '').trim(), genreId: String(body.genreId || '').trim() };
       let items = [];
       for (let page = 1; page <= 2; page++) {
         const part = await research.rakutenSearch(settings.rakutenAppId,
-          settings.rakutenAccessKey, keyword, 30, page);
+          settings.rakutenAccessKey, keyword, 30, page, opts);
         items = items.concat(part);
         if (part.length < 30) break;
         await new Promise((r) => setTimeout(r, 1100));   // 連続アクセスを避ける
@@ -541,7 +544,8 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { error: '設定画面で楽天アプリIDを登録してください。' });
       }
       const items = await research.rakutenSearch(settings.rakutenAppId,
-        settings.rakutenAccessKey, body.keyword, body.hits);
+        settings.rakutenAccessKey, body.keyword, body.hits, 1,
+        { ng: String(body.ng || '').trim(), genreId: String(body.genreId || '').trim() });
       return send(res, 200, { items });
     }
 
@@ -788,6 +792,41 @@ const server = http.createServer(async (req, res) => {
         html = at === -1 ? r.toc + html : html.slice(0, at) + r.toc + html.slice(at);
       }
       return send(res, 200, { html, toc: '', headings: r.headings });
+    }
+
+    // ===== アイキャッチを生成する（fal.ai） =====
+    if (p === '/api/eyecatch/generate') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '先にURL（スラッグ）を決めてください' });
+      // 日本語で書かれていたら、画像生成向けの英語に直してから送ります。
+      // 翻訳は Claude Code に頼むので、追加の鍵や費用はかかりません。
+      const t = await translate.toEnglish(body.prompt, settings.aiModel);
+      const r = await imageAI.generate(settings.falKey, {
+        prompt: t.english,
+        model: body.model,
+        style: settings.imageStyle || imageAI.DEFAULT_STYLE,
+      });
+      const file = path.join(ROOT, 'site', 'assets', 'eyecatch', `${pr.slug}.jpg`);
+      // 同じ名前のpngが残っていると、どちらが使われるか分からなくなるので消します
+      const png = file.replace(/\.jpg$/, '.png');
+      if (fs.existsSync(png)) fs.unlinkSync(png);
+      const size = imageAI.saveAs(r.buffer, file);
+      const rel = `/assets/eyecatch/${pr.slug}.jpg`;
+      writeArticle(pr, null, { eyecatch: rel });
+      return send(res, 200, {
+        ok: true, path: rel, kb: Math.round(size / 1024),
+        promptJa: t.translated ? String(body.prompt).trim() : '',
+        promptEn: t.english,
+      });
+    }
+
+    if (p === '/api/eyecatch/models') {
+      return send(res, 200, {
+        models: imageAI.MODELS,
+        hasKey: !!settings.falKey,
+        style: settings.imageStyle || imageAI.DEFAULT_STYLE,
+        defaultStyle: imageAI.DEFAULT_STYLE,
+      });
     }
 
     // ===== 本文に入れる画像 =====

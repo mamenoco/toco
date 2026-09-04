@@ -48,7 +48,7 @@ function htmlToText(html) {
 
 // 2026年の仕様変更で、applicationId（UUID）に加えて accessKey が必須になりました。
 // accessKey は秘密の値なので、URLではなくヘッダーで送ります。
-async function rakutenSearch(appId, accessKey, keyword, hits, page) {
+async function rakutenSearch(appId, accessKey, keyword, hits, page, opts) {
   if (!accessKey) {
     throw new Error('設定画面で「アクセスキー」も登録してください（2026年からApplication IDだけでは使えません）。');
   }
@@ -56,7 +56,10 @@ async function rakutenSearch(appId, accessKey, keyword, hits, page) {
     'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701' +
     `?applicationId=${encodeURIComponent(appId)}` +
     `&keyword=${encodeURIComponent(keyword)}` +
-    `&hits=${hits || 30}&page=${page || 1}&sort=-reviewCount&imageFlag=1`;
+    `&hits=${hits || 30}&page=${page || 1}&sort=-reviewCount&imageFlag=1`
+    // 除外キーワード。「うさぎ トイレ」で砂やシーツばかり出るときに使います。
+    + ((opts && opts.ng) ? `&NGKeyword=${encodeURIComponent(opts.ng)}` : '')
+    + ((opts && opts.genreId) ? `&genreId=${encodeURIComponent(opts.genreId)}` : '');
   const res = await fetch(url, { headers: { accessKey } });
   const json = await res.json().catch(() => ({}));
   if (json.error) {
@@ -86,6 +89,7 @@ async function rakutenSearch(appId, accessKey, keyword, hits, page) {
       reviewCount: i.reviewCount,
       reviewAverage: i.reviewAverage,
       shop: i.shopName,
+      genreId: String(i.genreId || ''),
       image: (i.mediumImageUrls && i.mediumImageUrls[0] && i.mediumImageUrls[0].imageUrl) || '',
       caption: (i.itemCaption || '').slice(0, 600),
       specs: {},

@@ -433,8 +433,10 @@ $('#btnSearch').addEventListener('click', async () => {
   if (!kw) return toast('キーワードを入れてください');
   $('#searchNote').innerHTML = '<span class="spin"></span>検索しています…';
   try {
-    const r = await api('search', { keyword: kw, hits: 30 });
-    $('#searchNote').textContent = `${r.items.length}件（レビュー件数の多い順）`;
+    const ng = $('#searchNg').value.trim();
+    const r = await api('search', { keyword: kw, hits: 30, ng });
+    $('#searchNote').textContent = `${r.items.length}件（レビュー件数の多い順）`
+      + (ng ? `　除外：${ng}` : '');
     $('#searchResults').innerHTML = r.items.map((it, i) => `
       <div class="item"><img src="${esc(it.image)}" alt="">
         <div class="body"><div class="nm">${esc(it.name)}</div>
@@ -453,6 +455,9 @@ $('#btnSearch').addEventListener('click', async () => {
 });
 
 // ---- 候補の自動選出 ----
+$('#searchKeyword').addEventListener('input', () => { CURATE_GENRE = ''; });
+$('#searchNg').addEventListener('input', () => { CURATE_GENRE = ''; });
+
 $('#btnCurate').addEventListener('click', async () => {
   const kw = $('#searchKeyword').value.trim();
   if (!kw) return toast('キーワードを入れてください');
@@ -460,14 +465,36 @@ $('#btnCurate').addEventListener('click', async () => {
   $('#curateBox').innerHTML = '';
   $('#searchNote').innerHTML = '<span class="spin"></span>楽天を調べています（10〜20秒かかります）…';
   let r;
-  try { r = await api('search/curate', { keyword: kw, want: 10 }); }
-  catch (e) { $('#searchNote').textContent = ''; return; }
+  try {
+    r = await api('search/curate', {
+      keyword: kw, want: 10,
+      ng: $('#searchNg').value.trim(),
+      genreId: CURATE_GENRE || '',
+    });
+  } catch (e) { $('#searchNote').textContent = ''; return; }
 
+  const ngUsed = $('#searchNg').value.trim();
   $('#searchNote').textContent =
-    `検索 ${r.searched}件（企画ものを除外 ${r.skipped}件）→ 同じ商品をまとめて ${r.unique}商品 → 候補 ${r.candidates.length}点`;
+    `検索 ${r.searched}件（企画ものを除外 ${r.skipped}件）→ 同じ商品をまとめて ${r.unique}商品 → 候補 ${r.candidates.length}点`
+    + (ngUsed ? `　除外キーワード：${ngUsed}` : '')
+    + (CURATE_GENRE ? '　ジャンル絞り込み中' : '');
 
   CURATED = r.candidates;
-  $('#curateBox').innerHTML = `
+
+  // ジャンルでの絞り込み。楽天はジャンル名を返さないので、代表的な商品名で示します。
+  const genreHtml = (r.genres || []).length > 1 ? `
+    <div class="card" style="margin:10px 0;padding:14px 16px">
+      <b style="font-size:12px">ジャンルで絞る</b>
+      <p class="note" style="margin:4px 0 8px">同じ検索でも種類の違う商品が混ざります。
+        目当ての商品が入っているまとまりを選ぶと、そこだけで選び直せます。</p>
+      <div class="row">
+        ${CURATE_GENRE ? '<button class="ghost" data-genre="">絞り込みを外す</button>' : ''}
+        ${r.genres.map((g) => `<button class="${CURATE_GENRE === g.id ? 'primary' : 'ghost'}" data-genre="${esc(g.id)}"
+            title="${esc(g.samples.join(' / '))}">${g.count}件　${esc(g.samples[0] || '')}</button>`).join('')}
+      </div>
+    </div>` : '';
+
+  $('#curateBox').innerHTML = genreHtml + `
     <p class="note">記事に載せるものにチェックを入れてください。<b>6〜7点</b>が目安です。
       価格帯とサイズが散るように選ぶと、比較記事として読みやすくなります。</p>
     <div class="list">${r.candidates.map((c, i) => `
@@ -487,6 +514,11 @@ $('#btnCurate').addEventListener('click', async () => {
       <button class="primary" id="btnAddPicked">選んだ商品をこの記事に追加</button>
       <span class="note" id="pickCount">0点を選択中</span>
     </div>`;
+
+  $('#curateBox').querySelectorAll('[data-genre]').forEach((b) => b.addEventListener('click', () => {
+    CURATE_GENRE = b.dataset.genre || '';
+    $('#btnCurate').click();
+  }));
 
   const update = () => {
     const n = $('#curateBox').querySelectorAll('[data-pick]:checked').length;
@@ -770,6 +802,7 @@ $('#bodyImgFile').addEventListener('change', async (e) => {
 });
 
 let CURATED = [];
+let CURATE_GENRE = '';   // ジャンルで絞り込んでいるとき、そのID
 let AI_SUGGESTED = null;
 let AI_JOB = null, AI_TIMER = null;
 
@@ -1430,6 +1463,7 @@ function fillMetaForm() {
   updateUrlPreview();
   renderPubReady();
   renderEyecatch();
+  initEyeGen();
 }
 
 function updateUrlPreview() {
@@ -1538,6 +1572,56 @@ function renderEyecatch() {
     toast('外しました');
   };
 }
+
+// ---- AIでアイキャッチを作る ----
+// ひな形。日本語のまま送れます（英語には自動で直されます）。
+const EYE_TEMPLATES = {
+  items: '明るい木のテーブルに、陶器の食器と編みかご、乾燥した牧草をきれいに並べたところ',
+  hay: '木の床に置かれた白い陶器のボウルに入った乾燥牧草と、そばに置かれた小さなかご',
+  room: '朝の光が入る明るいリビングの一角。木の床に小さなペット用ケージ、レースのカーテン。動物は写っていない',
+};
+
+async function initEyeGen() {
+  let r;
+  try { r = await api('eyecatch/models'); } catch (e) { return; }
+  $('#eyeModel').innerHTML = r.models.map((m) =>
+    `<option value="${esc(m.id)}" title="${esc(m.note)}">${esc(m.label)}</option>`).join('');
+  if (!r.hasKey) {
+    $('#eyeGenNote').innerHTML = '<span style="color:var(--err)">fal.ai のAPIキーが未設定です。'
+      + '設定画面で登録すると使えます。</span>';
+    $('#btnEyeGen').disabled = true;
+  } else {
+    $('#eyeGenNote').textContent = '';
+    $('#btnEyeGen').disabled = false;
+  }
+}
+
+$$('[data-tpl]').forEach((b) => b.addEventListener('click', () => {
+  $('#eyePrompt').value = EYE_TEMPLATES[b.dataset.tpl] || '';
+  $('#eyePrompt').focus();
+}));
+
+$('#btnEyeGen').addEventListener('click', async () => {
+  const prompt = $('#eyePrompt').value.trim();
+  if (!prompt) return toast('どんな絵にするかを書いてください');
+  if (!CURRENT.slug) return toast('先にURLを決めて保存してください');
+  if (CURMETA.eyecatch && !confirm('いまのアイキャッチを置き換えます。よろしいですか？')) return;
+
+  $('#btnEyeGen').disabled = true;
+  $('#eyeGenNote').innerHTML = '<span class="spin"></span>英語に直してから作っています（20〜50秒ほど）…';
+  try {
+    const r = await api('eyecatch/generate', {
+      id: CURRENT.id, prompt, model: $('#eyeModel').value,
+    });
+    CURMETA.eyecatch = r.path;
+    renderEyecatch(); renderPubReady();
+    $('#eyeGenNote').innerHTML = `できました（${r.kb}KB・1200×630）。気に入らなければ、もう一度作れます。`
+      + (r.promptJa ? `<br><span style="color:var(--mute)">送った英語：${esc(r.promptEn)}</span>` : '');
+    toast('アイキャッチを作りました');
+  } catch (e) {
+    $('#eyeGenNote').textContent = '';
+  } finally { $('#btnEyeGen').disabled = false; }
+});
 
 $('#eyeFile').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];

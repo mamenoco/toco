@@ -230,11 +230,22 @@ function curate(items, opts) {
   const grouped = dedupe(usable);
   const scored = score(grouped);
   const picked = diversify(scored, want, o.inventory);
+  // ジャンルの内訳。楽天はジャンル名を返さないので、代表的な商品名を添えて示します。
+  const byGenre = {};
+  usable.forEach((x) => {
+    const g = x.genreId || '(不明)';
+    if (!byGenre[g]) byGenre[g] = { id: g, count: 0, samples: [] };
+    byGenre[g].count++;
+    if (byGenre[g].samples.length < 2) byGenre[g].samples.push(cleanName(x.name).slice(0, 26));
+  });
+  const genres = Object.values(byGenre).sort((a, b) => b.count - a.count).slice(0, 8);
+
   return {
     candidates: picked.map((x) => { const y = Object.assign({}, x); delete y._tokens; delete y._score; return y; }),
     searched: items.length,
     skipped: items.length - usable.length,
     unique: grouped.length,
+    genres,
   };
 }
 
