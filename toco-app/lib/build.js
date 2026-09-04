@@ -244,6 +244,19 @@ function buildAssets() {
       '.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}',
       // まだ書いていない記事へのリンク（読者には普通の文字として見えます）
       '.link-todo{color:inherit}',
+      // 段落の下に出す記事カード
+      [
+        '.rel-cards{display:grid;gap:10px;margin:0 0 1.8em}',
+        '@media(min-width:700px){.rel-cards:has(> :nth-child(2)){grid-template-columns:1fr 1fr}}',
+        '.entry-content .related-link.has-img{display:flex;gap:14px;align-items:center;margin:0;padding:12px 14px}',
+        '.entry-content .related-link.has-img img{width:88px;height:60px;flex:0 0 auto;',
+        'object-fit:cover;border-radius:8px;background:var(--beige)}',
+        '.entry-content .related-link .rel-text{min-width:0;display:block}',
+        '.entry-content .related-link .rel-text strong{display:block;color:var(--ink);',
+        'font-size:13px;font-weight:600;line-height:1.55}',
+        '.entry-content .related-link .rel-text em{display:block;margin-top:3px;color:#a3968f;',
+        'font-size:11px;font-style:normal;line-height:1.6}',
+      ].join(''),
       // よくある質問の見出し
       '.entry-content h3.faq-q::before{content:"Q. ";color:var(--pink-dark);font-weight:700}',
       // 商品カード
@@ -371,13 +384,35 @@ function rankingLinks(keyword, ctx) {
 
 // ---- まだ書いていない記事へのリンク ----
 // 記事ができていればリンクになり、無ければ文字のまま出ます。
+// カードに出す短い説明。文の途中でぶつ切りにならないよう、句点で切ります。
+function shortDesc(text) {
+  const t = String(text).trim();
+  if (t.length <= 56) return t;
+  const cut = t.slice(0, 56);
+  const at = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('、'));
+  return at >= 24 ? cut.slice(0, at + 1) : cut.slice(0, 46) + '…';
+}
+
 function makeLinkResolver(ctx) {
+  // 同じ記事のカードが何枚も出ないよう、1記事につき1回だけにします
+  const carded = new Set();
   return (slug, label) => {
     const a = ctx.bySlug[slug];
-    if (a && a.status === 'publish') {
-      return '<a href="/' + esc(slug) + '/">' + esc(label) + '</a>';
+    if (!a || a.status !== 'publish') {
+      return { html: '<span class="link-todo" title="記事ができたらリンクになります">' + esc(label) + '</span>' };
     }
-    return '<span class="link-todo" title="記事ができたらリンクになります">' + esc(label) + '</span>';
+    const html = '<a href="/' + esc(slug) + '/">' + esc(label) + '</a>';
+    if (carded.has(slug)) return { html };
+    carded.add(slug);
+    return {
+      html,
+      card: '<a class="related-link has-img" href="/' + esc(slug) + '/">'
+        + '<img src="' + esc(cardImage(a)) + '" alt="" loading="lazy">'
+        + '<span class="rel-text"><small>関連記事</small>'
+        + '<strong>' + esc(a.title) + '</strong>'
+        + (a.description ? '<em>' + esc(shortDesc(a.description)) + '</em>' : '')
+        + '</span></a>',
+    };
   };
 }
 
@@ -575,8 +610,12 @@ function build(opts) {
   const published = all.filter((a) => a.status === 'publish')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
+  // {{link:…}} の解決先。記事だけでなく固定ページにもリンクできるようにします。
   ctx.bySlug = {};
   all.forEach((a) => { ctx.bySlug[a.slug] = a; });
+  loadMarkdownDir(PAGES, 'page').forEach((p) => {
+    ctx.bySlug[p.slug] = Object.assign({}, p, { status: 'publish' });
+  });
 
   published.forEach((a, i) => buildSingle(a, published[i + 1], published[i - 1], ctx));
 

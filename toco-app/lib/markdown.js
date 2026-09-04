@@ -15,13 +15,23 @@ function esc(s) {
 }
 
 // {{link:スラッグ|表示する文字}} を解決する関数。render() のあいだだけ差し込みます。
+// 解決先が公開済みの記事なら、文中をリンクにしたうえで、
+// その段落の下に記事カード（アイキャッチ＋タイトル）を出します。
 let LINK_RESOLVER = null;
+let LINK_CARDS = [];
 
 function inline(t) {
   return t
     // まだ書いていない記事へのリンク。記事ができたら自動でリンクに変わります。
-    .replace(/\{\{link:([^}|]+)(?:\|([^}]*))?\}\}/g, (m, slug, label) =>
-      (LINK_RESOLVER ? LINK_RESOLVER(slug.trim(), (label || slug).trim()) : (label || slug).trim()))
+    .replace(/\{\{link:([^}|]+)(?:\|([^}]*))?\}\}/g, (m, slug, label) => {
+      const s = slug.trim();
+      const l = (label || slug).trim();
+      if (!LINK_RESOLVER) return l;
+      const r = LINK_RESOLVER(s, l);
+      if (typeof r === 'string') return r;
+      if (r && r.card) LINK_CARDS.push(r.card);
+      return (r && r.html) || l;
+    })
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -43,6 +53,7 @@ function render(md, opts) {
   const product = options.product || ((id) => `<!-- product not found: ${esc(id)} -->`);
   const ranking = options.ranking || (() => '');
   LINK_RESOLVER = options.link || null;
+  LINK_CARDS = [];
   const pendingLinks = [];
   if (!options.link) {
     // 解決先が渡されていないときは、リンク待ちとして記録だけしておきます
@@ -72,7 +83,14 @@ function render(md, opts) {
   const autoId = {};
   let autoSeq = 0;
 
-  const push = (html) => out.push(html);
+  // 直前の行に記事カードが溜まっていれば、その行のすぐ下に出します。
+  const push = (html) => {
+    out.push(html);
+    if (LINK_CARDS.length) {
+      out.push('<div class="rel-cards">' + LINK_CARDS.join('') + '</div>');
+      LINK_CARDS = [];
+    }
+  };
   const para = (html, cls) => push(`<p${cls ? ` class="${cls}"` : ''}>${html}</p>`);
 
   const uniqueId = (base) => {

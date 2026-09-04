@@ -32,8 +32,12 @@ function sources() {
 
 // 記事とページを全部読んで、リンク待ちを集めます。
 function scan() {
+  // 記事だけでなく、固定ページもリンク先になります
   const existing = {};
   articles.list().forEach((a) => { existing[a.slug] = a; });
+  sources().filter((x) => x.kind === 'page').forEach((p) => {
+    if (!existing[p.slug]) existing[p.slug] = { slug: p.slug, title: p.title, status: 'publish' };
+  });
 
   const found = {};
   sources().forEach((src) => {
