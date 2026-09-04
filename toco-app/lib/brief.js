@@ -74,6 +74,11 @@ function buildBrief(project, inventory, styleGuide) {
   (project.products || []).forEach((p, idx) => {
     L.push(`### ${idx + 1}. ${p.name}`);
     L.push('');
+    if (p.masterId) {
+      L.push('- **記事に書く記法：`{{product:' + p.masterId + '}}`**');
+      L.push('  この商品を紹介する見出しの直後に、この1行をそのまま置いてください。');
+      L.push('  IDを勝手に変えたり、新しく作ったりしないでください。カードが出なくなります。');
+    }
     L.push(`- 商品コード：${p.code || '–'}`);
     L.push(`- ショップ：${p.shop || '–'}`);
     L.push(`- レビュー：${p.reviewAverage || '–'}（${p.reviewCount || 0}件）`);

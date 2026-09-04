@@ -526,6 +526,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/brief') {
       const pr = db.projects.find((x) => x.id === body.id);
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
+      registerPicked(pr);          // 先にIDを確定させてからブリーフに書く
       const md = buildBrief(pr, db.inventory);
       const dir = path.join(ROOT, '..', 'articles', 'briefs');
       fs.mkdirSync(dir, { recursive: true });
@@ -547,6 +548,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      if (body.mode === 'write') registerPicked(pr);   // 商品IDを確定させてから書かせる
       const brief = body.mode === 'write' ? buildBrief(pr, db.inventory) : '';
       const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current);
       const jobId = DB.newId();
@@ -849,7 +851,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/site/build') {
-      const r = builder.build({ year: new Date().getFullYear(), assetVer: String(Date.now()).slice(-6) });
+      // drafts:true のときだけ下書きも書き出します（手元のプレビュー専用）。
+      // 「サイトに反映する」は必ず下書きを除いて作り直すので、公開されることはありません。
+      const r = builder.build({
+        year: new Date().getFullYear(), assetVer: String(Date.now()).slice(-6),
+        includeDrafts: !!body.drafts,
+      });
       LAST.build = new Date().toISOString();
       return send(res, 200, { ok: true, result: r, site: siteState() });
     }
@@ -881,6 +888,32 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { error: e.message || String(e) });
   }
 });
+
+// 記事で選んだ商品を商品マスタに登録し、確定したIDを商品に書き戻します。
+// これをしておかないと、AIが記法のIDを推測してしまい、商品カードが出なくなります。
+function registerPicked(pr) {
+  let changed = false;
+  (pr.products || []).forEach((item) => {
+    const master = products.load();
+    const found = master.find((x) =>
+      (item.code && x.rakuten && x.rakuten.itemCode === item.code)
+      || (item.url && x.rakuten && x.rakuten.url
+          && x.rakuten.url.split('?')[0] === String(item.url).split('?')[0])
+      || x.name === item.name);
+    const saved = products.upsert(products.fromSearchItem(item, {
+      id: found ? found.id : undefined,
+      category: categorySlug(pr.category),
+      brand: found ? found.brand : '',
+    }));
+    if (item.masterId !== saved.id) { item.masterId = saved.id; changed = true; }
+  });
+  if (changed) {
+    const db = DB.loadDb();
+    const i = db.projects.findIndex((x) => x.id === pr.id);
+    if (i >= 0) { db.projects[i].products = pr.products; DB.saveDb(db); }
+  }
+  return pr.products.map((x) => x.masterId).filter(Boolean);
+}
 
 // 新しい記事（プロジェクト）を作る。同時に空の記事ファイルも用意します。
 function newProject(db, src) {

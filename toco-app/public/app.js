@@ -697,7 +697,7 @@ $('#btnSaveArticle').addEventListener('click', async () => {
 
 $('#btnOpenPreview').addEventListener('click', async () => {
   await saveProject({ article: $('#articleText').value });
-  await api('site/build', {});
+  await api('site/build', { drafts: true });
   window.open(STATE.site.previewUrl + CURRENT.slug + '/', '_blank');
 });
 
@@ -978,7 +978,7 @@ async function renderPreview(opts) {
   const keep = o.keepScroll && f.contentWindow ? f.contentWindow.scrollY : 0;
 
   await saveProject({ article: $('#articleText').value });
-  if (!o.skipBuild) await api('site/build', {});     // 最新のCSSを作る
+  if (!o.skipBuild) await api('site/build', { drafts: true });   // 最新のCSSを作る
   const r = await api('preview-html', { id: CURRENT.id, article: $('#articleText').value });
   const doc = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
     <link rel="stylesheet" href="/preview.css">
@@ -1315,11 +1315,14 @@ function renderPubReady() {
 ['#pubTitle', '#pubDesc'].forEach((s) => $(s).addEventListener('input', renderPubReady));
 
 $('#btnBuildOnly').addEventListener('click', async () => {
+  await $('#btnSaveMeta').click();
   $('#pubLog').style.display = '';
   $('#pubLog').textContent = 'サイトを書き出しています…';
-  const r = await api('site/build', {});
-  $('#pubLog').textContent = `書き出しました（記事${r.result.articles}本・${r.result.ms}ms）\n`
-    + `プレビュー： ${STATE.site.previewUrl}${CURRENT.slug}/`;
+  // 下書きも含めて書き出します。手元のプレビューでしか見られません。
+  const r = await api('site/build', { drafts: true });
+  $('#pubLog').textContent = `書き出しました（公開${r.result.articles}本・下書き${r.result.drafts}本・${r.result.ms}ms）\n`
+    + `プレビュー： ${STATE.site.previewUrl}${CURRENT.slug}/\n`
+    + '※ 下書きは手元でだけ見られます。サイトには出ていません。';
   window.open(STATE.site.previewUrl + CURRENT.slug + '/', '_blank');
 });
 

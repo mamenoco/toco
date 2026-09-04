@@ -244,6 +244,9 @@ function buildAssets() {
       '.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}',
       // まだ書いていない記事へのリンク（読者には普通の文字として見えます）
       '.link-todo{color:inherit}',
+      // 下書きプレビューの帯
+      '.draft-note{max-width:900px;margin:0 auto 14px;padding:11px 20px;border-radius:10px;'
+      + 'background:#fbf1e1;color:#8a6d3b;font-size:12px;line-height:1.7}',
       // 本文中のマーカー（==テキスト== で囲んだところ）
       [
         '.entry-content mark.hl{',
@@ -476,9 +479,15 @@ function buildSingle(a, prev, next, ctx) {
     PREV: link(prev, 'previous', 'prev'), NEXT: link(next, 'next', 'next'),
   });
 
+  const banner = ctx.draft
+    ? '<div class="draft-note">この記事は<b>下書き</b>です。手元の確認用に書き出したもので、'
+      + 'サイトには公開されていません。</div>' : '';
+
   write(`${a.slug}/index.html`, layout({
     path: `/${a.slug}/`, title: a.title, description: a.description,
-    image: a.eyecatch, type: 'article', bodyClass: 'single', content, ...ctx,
+    image: a.eyecatch, type: 'article', bodyClass: 'single',
+    noindex: !!ctx.draft,
+    content: banner + content, ...ctx,
   }));
 }
 
@@ -640,6 +649,12 @@ function build(opts) {
   const published = all.filter((a) => a.status === 'publish')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
+  // 下書きは通常のビルドには含めません（公開されてしまうため）。
+  // options.includeDrafts のときだけ、手元のプレビュー用に書き出します。
+  // 一覧・サイトマップ・検索には入れず、noindex を付けます。
+  const drafts = options.includeDrafts
+    ? all.filter((a) => a.status !== 'publish') : [];
+
   // {{link:…}} の解決先。記事だけでなく固定ページにもリンクできるようにします。
   ctx.bySlug = {};
   all.forEach((a) => { ctx.bySlug[a.slug] = a; });
@@ -648,6 +663,7 @@ function build(opts) {
   });
 
   published.forEach((a, i) => buildSingle(a, published[i + 1], published[i - 1], ctx));
+  drafts.forEach((a) => buildSingle(a, null, null, Object.assign({}, ctx, { draft: true })));
 
   config.categories.forEach((c) => {
     buildArchive(`/category/${c.slug}/`, c.name, published.filter((a) => a.category === c.slug), ctx);
@@ -662,7 +678,7 @@ function build(opts) {
   return {
     ms: Date.now() - started,
     articles: published.length,
-    drafts: all.length - published.length,
+    drafts: drafts.length,
     pages: pages.length,
     imagesBefore: assets.imagesBefore,
     imagesAfter: assets.imagesAfter,

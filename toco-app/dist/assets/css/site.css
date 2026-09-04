@@ -382,6 +382,25 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 /* --- 各セクションの結論の1文（選び方など） --- */
 /* 見出しに見えないよう、文字の幅ぶんだけ色を敷きます。
    段落なので block ですが、inline-block にすると中身の幅に縮みます。 */
+/* 先頭の電球アイコン。
+   画像ファイルではなくCSSに埋め込んだSVGなので、読み込みが増えません。
+   mask を使っているため、色は background だけで変えられます。 */
+.entry-content .lead::before {
+  content: "";
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: .4em;
+  vertical-align: -.24em;
+  background: var(--pink-dark);
+  -webkit-mask: var(--icon-bulb) center / contain no-repeat;
+  mask: var(--icon-bulb) center / contain no-repeat;
+}
+
+:root {
+  --icon-bulb: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.4 18.2h5.2"/><path d="M10.4 21h3.2"/><path d="M12 2.4a6.4 6.4 0 0 0-3.8 11.5c.7.5 1 1.2 1.1 2l.1.4h5.2l.1-.4c.1-.8.4-1.5 1.1-2A6.4 6.4 0 0 0 12 2.4Z"/></svg>');
+}
+
 .entry-content .lead {
   display: inline-block;
   max-width: 100%;
@@ -404,6 +423,7 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 .contact-form{margin:24px 0}.contact-form iframe{width:100%;border:0;border-radius:12px;background:#fff}
 .mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}
 .link-todo{color:inherit}
+.draft-note{max-width:900px;margin:0 auto 14px;padding:11px 20px;border-radius:10px;background:#fbf1e1;color:#8a6d3b;font-size:12px;line-height:1.7}
 .entry-content mark.hl{background:linear-gradient(transparent 56%, rgba(239,174,179,.5) 56%);color:inherit;font-weight:700;padding:0 1px}
 .entry-content figure.ph{margin:26px 0}.entry-content figure.ph img{display:block;width:100%;height:auto;border-radius:12px}.entry-content figure.ph figcaption{margin-top:8px;color:#a3968f;font-size:11px;line-height:1.7;text-align:center}
 .rel-cards{display:grid;gap:10px;margin:0 0 1.8em}@media(min-width:700px){.rel-cards:has(> :nth-child(2)){grid-template-columns:1fr 1fr}}.entry-content .related-link.has-img{display:flex;gap:14px;align-items:center;margin:0;padding:12px 14px}.entry-content .related-link.has-img img{width:88px;height:60px;flex:0 0 auto;object-fit:cover;border-radius:8px;background:var(--beige)}.entry-content .related-link .rel-text{min-width:0;display:block}.entry-content .related-link .rel-text strong{display:block;color:var(--ink);font-size:13px;font-weight:600;line-height:1.55}.entry-content .related-link .rel-text em{display:block;margin-top:3px;color:#a3968f;font-size:11px;font-style:normal;line-height:1.6}

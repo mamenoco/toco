@@ -81,13 +81,37 @@ const EXP_WORDS = ['わが家', '我が家', 'うちのうさぎ', 'うちの子
 // 商品名が本文に出てくるか判定する。
 // 記事では「見出し＝商品名／次の行＝ブランド名」と分かれるため、
 // 名前を語に分け、長い語（型番を含む部分）のどれかが本文にあれば一致とみなす。
+// 楽天の商品名は宣伝文句だらけで、記事では短く書き直されます。
+//   登録名：RENEWAL 歴代名馬も愛した チモシー1番刈り 2番刈り 王様チモシー / 魔法の様な…
+//   本文  ：王様チモシー 1番刈り・2番刈り
+// そのため「長い語が含まれるか」では判定できません。
+// 商品名から宣伝文句を落としたうえで、隣り合う2文字の集合がどれだけ本文に含まれるかで見ます。
+const NAME_NOISE = /送料無料|送料込|あす楽|即納|在庫あり|新品|正規品|ポイント|倍|最大|セール|期間限定|クーポン|限定|数量限定|まとめ買い|お買い得|人気|おすすめ|楽天|ランキング|入賞|新刈り|年度産|令和\d*年?産?|\d+%オフ|パスプレ|袋付/g;
+
+function nameKey(name) {
+  return String(name || '')
+    .replace(/[【】\[\]（）()《》]/g, ' ')
+    .replace(NAME_NOISE, ' ')
+    .replace(/[\s　・,、/／|｜×xX+＋]/g, '')
+    .toLowerCase();
+}
+
+function bigrams(t) {
+  const set = new Set();
+  for (let i = 0; i < t.length - 1; i++) set.add(t.slice(i, i + 2));
+  return set;
+}
+
 function nameAppears(name, flatText) {
-  const parts = String(name || '')
-    .split(/[\s　・／\/（）()]+/)
-    .filter((s) => s.length >= 3)
-    .sort((a, b) => b.length - a.length);
-  if (!parts.length) return true;
-  return parts.slice(0, 2).some((k) => flatText.includes(k));
+  const key = nameKey(name);
+  if (key.length < 4) return true;
+  if (flatText.includes(key)) return true;
+  // 商品名の2文字並びが、本文にどれだけ出てくるか
+  const g = bigrams(key);
+  if (!g.size) return true;
+  let hit = 0;
+  g.forEach((x) => { if (flatText.includes(x)) hit++; });
+  return hit / g.size >= 0.8;
 }
 
 function runChecks(article, project, inventory) {
@@ -329,7 +353,21 @@ function runChecks(article, project, inventory) {
     // 記事では「見出し＝商品名／次の行＝ブランド名」と分かれるため、
     // 商品名の中でいちばん長い語（型番を含む部分）で照合する
     const flat = text.replace(/\s+/g, '');
-    const missing = products.filter((pd) => !nameAppears(pd.name, flat));
+    // 本文に {{product:xxx}} が書かれていれば、その商品は確実に載っています。
+    // 商品マスタを引いて、登録した商品と結び付けます。
+    let referenced = [];
+    try {
+      const master = require('./products.js').load();
+      const ids = [...String(text).matchAll(/\{\{product:([A-Za-z0-9_-]+)\}\}/g)].map((m) => m[1]);
+      referenced = ids.map((id) => master.find((x) => x.id === id)).filter(Boolean);
+    } catch (e) { /* 商品マスタが無くても判定は続けます */ }
+
+    const isReferenced = (pd) => referenced.some((r) =>
+      (r.rakuten && pd.code && r.rakuten.itemCode === pd.code)
+      || (r.rakuten && pd.url && r.rakuten.url && r.rakuten.url.split('?')[0] === String(pd.url).split('?')[0])
+      || nameKey(r.name) === nameKey(pd.name));
+
+    const missing = products.filter((pd) => !isReferenced(pd) && !nameAppears(pd.name, flat));
     if (missing.length) {
       add('warn', `登録した商品${missing.length}点が本文に見当たりません`,
         missing.map((x) => x.name).join(' / '));

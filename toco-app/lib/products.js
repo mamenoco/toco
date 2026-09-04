@@ -25,10 +25,18 @@ function get(id) {
 
 // 商品IDは記事のMarkdownに {{product:xxx}} の形で書くので、
 // あとから見て何の商品か分かる文字列にします。
-function suggestId(name, taken) {
+// 商品IDは記事に {{product:xxx}} と書くので、あとから見て分かる文字列にします。
+// 日本語の商品名からは英数字が取れないため、楽天の商品コード（shop:number）を使います。
+//   「牧草市場 スーパープレミアム…」＋ mapet:10003327 → mapet-3327
+function suggestId(name, taken, code) {
   const used = new Set(taken || load().map((p) => p.id));
-  const base = String(name || 'item').toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'item';
+  let base = String(name || '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+  if (base.length < 3 && code) {
+    const m = String(code).match(/^([a-z0-9-]+):(\d+)$/i);
+    if (m) base = `${m[1]}-${m[2].slice(-4)}`;
+  }
+  if (base.length < 3) base = 'item';
   if (!used.has(base)) return base;
   for (let i = 2; i < 200; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
   return `${base}-${Date.now()}`;
@@ -52,7 +60,7 @@ function remove(id) {
 function fromSearchItem(item, opts) {
   const o = opts || {};
   return {
-    id: o.id || suggestId(o.idHint || item.name),
+    id: o.id || suggestId(o.idHint || item.name, null, item.code),
     name: item.name || '',
     brand: o.brand || '',
     category: o.category || '',
