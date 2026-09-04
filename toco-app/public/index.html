@@ -279,10 +279,12 @@
 
       <div id="eyeGenBox" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
         <h3 style="margin:0 0 4px">AIで作る</h3>
-        <p class="note"><b>日本語で書けます。</b>送るときに画像生成向けの英語へ自動で直します。
-          <b>うさぎそのものは描かせないでください。</b>
-          実在しないうさぎを実写のように見せると、実体験で書いているこのサイトでは誤解を招きます。
-          牧草・ケージ・食器・部屋の様子など、<b>ものや場所</b>を描くのが向いています。</p>
+        <p class="note"><b>日本語で書けます。</b>送るときに画像生成向けの英語へ自動で直します。</p>
+        <label style="margin:8px 0"><input type="checkbox" id="eyeNoAnimals" checked> うさぎや人を出さない</label>
+        <p class="note">実在しないうさぎを実写のように見せると、実体験で書いているこのサイトでは誤解を招きます。
+          牧草・ケージ・食器・部屋の様子など、<b>ものや場所</b>を描くのが向いています。<br>
+          ただし<b>画像生成AIは「描かない」という指示をあまり守れません。</b>
+          この設定でも出てしまうことがあるので、できた絵を見て判断してください。</p>
         <div class="row">
           <button class="ghost" data-tpl="items">商品まわり</button>
           <button class="ghost" data-tpl="hay">牧草・ごはん</button>
@@ -296,6 +298,8 @@
           <button class="primary" id="btnEyeGen">この内容で作る</button>
         </div>
         <p class="note" id="eyeGenNote"></p>
+
+        <div id="eyeHistory" style="margin-top:16px"></div>
       </div>
     </div>
 

@@ -805,7 +805,16 @@ const server = http.createServer(async (req, res) => {
         prompt: t.english,
         model: body.model,
         style: settings.imageStyle || imageAI.DEFAULT_STYLE,
+        noAnimals: body.noAnimals !== false,
       });
+      // 候補として履歴に残してから、いまのアイキャッチにします。
+      // 履歴は _history に置きます。公開されるサイトには含まれません。
+      const hist = path.join(ROOT, 'site', 'assets', 'eyecatch', '_history', pr.slug);
+      const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      imageAI.saveAs(r.buffer, path.join(hist, `${stamp}.jpg`));
+      fs.writeFileSync(path.join(hist, `${stamp}.txt`),
+        `${String(body.prompt || '').trim()}\n${t.english}\n`, 'utf8');
+
       const file = path.join(ROOT, 'site', 'assets', 'eyecatch', `${pr.slug}.jpg`);
       // 同じ名前のpngが残っていると、どちらが使われるか分からなくなるので消します
       const png = file.replace(/\.jpg$/, '.png');
@@ -818,6 +827,54 @@ const server = http.createServer(async (req, res) => {
         promptJa: t.translated ? String(body.prompt).trim() : '',
         promptEn: t.english,
       });
+    }
+
+    // これまでに作った画像の一覧
+    if (p === '/api/eyecatch/history') {
+      const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
+      if (!pr || !pr.slug) return send(res, 200, { items: [] });
+      const dir = path.join(ROOT, 'site', 'assets', 'eyecatch', '_history', pr.slug);
+      if (!fs.existsSync(dir)) return send(res, 200, { items: [] });
+      const items = fs.readdirSync(dir).filter((f) => /\.jpg$/i.test(f))
+        .sort().reverse().map((f) => {
+          const txt = path.join(dir, f.replace(/\.jpg$/, '.txt'));
+          const memo = fs.existsSync(txt) ? fs.readFileSync(txt, 'utf8').split('\n') : [];
+          return {
+            file: f,
+            url: `/assets/eyecatch/_history/${pr.slug}/${f}`,
+            kb: Math.round(fs.statSync(path.join(dir, f)).size / 1024),
+            ja: memo[0] || '', en: memo[1] || '',
+          };
+        });
+      return send(res, 200, { items });
+    }
+
+    // 履歴の1枚を、いまのアイキャッチにする
+    if (p === '/api/eyecatch/use') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '記事が見つかりません' });
+      const src = path.join(ROOT, 'site', 'assets', 'eyecatch', '_history', pr.slug,
+        path.basename(String(body.file || '')));
+      if (!fs.existsSync(src)) return send(res, 200, { error: '画像が見つかりません' });
+      const dest = path.join(ROOT, 'site', 'assets', 'eyecatch', `${pr.slug}.jpg`);
+      const png = dest.replace(/\.jpg$/, '.png');
+      if (fs.existsSync(png)) fs.unlinkSync(png);
+      fs.copyFileSync(src, dest);
+      const rel = `/assets/eyecatch/${pr.slug}.jpg`;
+      writeArticle(pr, null, { eyecatch: rel });
+      return send(res, 200, { ok: true, path: rel });
+    }
+
+    if (p === '/api/eyecatch/history/delete') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '記事が見つかりません' });
+      const base = path.basename(String(body.file || '')).replace(/\.jpg$/, '');
+      const dir = path.join(ROOT, 'site', 'assets', 'eyecatch', '_history', pr.slug);
+      ['.jpg', '.txt'].forEach((ext) => {
+        const f = path.join(dir, base + ext);
+        if (fs.existsSync(f)) fs.unlinkSync(f);
+      });
+      return send(res, 200, { ok: true });
     }
 
     if (p === '/api/eyecatch/models') {
@@ -916,6 +973,12 @@ const server = http.createServer(async (req, res) => {
       fs.mkdirSync(dir, { recursive: true });
       const name = `${pr.slug}.${m[1] === 'jpeg' ? 'jpg' : 'png'}`;
       fs.writeFileSync(path.join(dir, name), buf);
+      // 差し替えても戻せるよう、候補として履歴にも残します
+      const hist2 = path.join(dir, '_history', pr.slug);
+      fs.mkdirSync(hist2, { recursive: true });
+      const stamp2 = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      fs.writeFileSync(path.join(hist2, `${stamp2}.jpg`), buf);
+      fs.writeFileSync(path.join(hist2, `${stamp2}.txt`), 'アップロードした画像\n\n', 'utf8');
       const rel = `/assets/eyecatch/${name}`;
       writeArticle(pr, null, { eyecatch: rel });
       return send(res, 200, { ok: true, path: rel });

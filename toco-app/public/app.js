@@ -1464,6 +1464,7 @@ function fillMetaForm() {
   renderPubReady();
   renderEyecatch();
   initEyeGen();
+  renderEyeHistory();
 }
 
 function updateUrlPreview() {
@@ -1581,6 +1582,46 @@ const EYE_TEMPLATES = {
   room: '朝の光が入る明るいリビングの一角。木の床に小さなペット用ケージ、レースのカーテン。動物は写っていない',
 };
 
+// これまでに作った画像。差し替えても戻せます。
+async function renderEyeHistory() {
+  if (!CURRENT) return;
+  let r;
+  try { r = await (await fetch('/api/eyecatch/history?id=' + encodeURIComponent(CURRENT.id))).json(); }
+  catch (e) { return; }
+  const items = r.items || [];
+  const box = $('#eyeHistory');
+  if (!items.length) { box.innerHTML = ''; return; }
+
+  box.innerHTML = `<h3 style="margin:0 0 4px">これまでの候補 <span class="tag">${items.length}枚</span></h3>
+    <p class="note">押すとアイキャッチが差し替わります。作り直しても前のものは残ります。</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+      ${items.map((x, i) => `<div>
+        <img src="${esc(x.url)}" alt="" data-use="${i}"
+          style="width:100%;border:1px solid var(--line);border-radius:8px;cursor:pointer;display:block"
+          title="${esc(x.ja || x.en || '')}">
+        <div class="row" style="margin-top:4px;gap:6px">
+          <button class="ghost" data-use="${i}" style="padding:3px 9px;font-size:11px">これを使う</button>
+          <button class="ghost danger" data-del="${i}" style="padding:3px 9px;font-size:11px">削除</button>
+        </div>
+        <p class="note" style="margin:3px 0 0;font-size:10px">${esc((x.ja || x.en || '').slice(0, 34))}</p>
+      </div>`).join('')}
+    </div>`;
+
+  box.querySelectorAll('[data-use]').forEach((b) => b.addEventListener('click', async () => {
+    const x = items[Number(b.dataset.use)];
+    const r2 = await api('eyecatch/use', { id: CURRENT.id, file: x.file });
+    CURMETA.eyecatch = r2.path;
+    renderEyecatch(); renderPubReady();
+    toast('アイキャッチを差し替えました');
+  }));
+  box.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    const x = items[Number(b.dataset.del)];
+    if (!confirm('この候補を削除します。よろしいですか？')) return;
+    await api('eyecatch/history/delete', { id: CURRENT.id, file: x.file });
+    renderEyeHistory();
+  }));
+}
+
 async function initEyeGen() {
   let r;
   try { r = await api('eyecatch/models'); } catch (e) { return; }
@@ -1612,9 +1653,10 @@ $('#btnEyeGen').addEventListener('click', async () => {
   try {
     const r = await api('eyecatch/generate', {
       id: CURRENT.id, prompt, model: $('#eyeModel').value,
+      noAnimals: $('#eyeNoAnimals').checked,
     });
     CURMETA.eyecatch = r.path;
-    renderEyecatch(); renderPubReady();
+    renderEyecatch(); renderPubReady(); renderEyeHistory();
     $('#eyeGenNote').innerHTML = `できました（${r.kb}KB・1200×630）。気に入らなければ、もう一度作れます。`
       + (r.promptJa ? `<br><span style="color:var(--mute)">送った英語：${esc(r.promptEn)}</span>` : '');
     toast('アイキャッチを作りました');
@@ -1647,7 +1689,7 @@ $('#eyeFile').addEventListener('change', (e) => {
       try {
         const r = await api('eyecatch/save', { id: CURRENT.id, dataUrl: cv.toDataURL('image/jpeg', 0.85) });
         CURMETA.eyecatch = r.path;
-        renderEyecatch(); renderPubReady();
+        renderEyecatch(); renderPubReady(); renderEyeHistory();
         const after = Math.round(cv.toDataURL('image/jpeg', 0.85).length * 0.75 / 1024);
         $('#eyeSaved').textContent = `${before}KB → 約${after}KB（1200×630）`;
         toast('アイキャッチを保存しました');

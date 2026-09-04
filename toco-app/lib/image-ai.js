@@ -28,6 +28,11 @@ const DEFAULT_STYLE = 'soft watercolor illustration, warm cream and dusty pink p
   + 'delicate botanical accents, gentle natural light, calm and clean composition, '
   + 'no text, no letters, no watermark';
 
+// 動物を出さないための指定。
+// 画像生成AIは「〜を描かない」という指示をあまり守れないので、
+// 「静物」「物だけ」という肯定形で寄せるほうが効きます。それでも確実ではありません。
+const NO_ANIMALS = 'still life of objects only, empty scene without any animals or people';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function headers(key, json) {
@@ -62,7 +67,8 @@ async function generate(key, opts) {
   if (!subject) throw new Error('どんな絵にするかを書いてください');
 
   const style = String(o.style || DEFAULT_STYLE).trim();
-  const prompt = `${subject}. ${style}`;
+  const parts = [subject, o.noAnimals === false ? '' : NO_ANIMALS, style].filter(Boolean);
+  const prompt = parts.join('. ');
 
   // 1200×630 に近い比率で作り、あとで正確に切り抜きます
   const input = {
@@ -133,4 +139,4 @@ function saveAs(buffer, file) {
   return fs.statSync(file).size;
 }
 
-module.exports = { MODELS, DEFAULT_STYLE, generate, saveAs, findImageUrl };
+module.exports = { MODELS, DEFAULT_STYLE, NO_ANIMALS, generate, saveAs, findImageUrl };
