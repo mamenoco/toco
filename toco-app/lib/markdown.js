@@ -14,8 +14,14 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// {{link:スラッグ|表示する文字}} を解決する関数。render() のあいだだけ差し込みます。
+let LINK_RESOLVER = null;
+
 function inline(t) {
   return t
+    // まだ書いていない記事へのリンク。記事ができたら自動でリンクに変わります。
+    .replace(/\{\{link:([^}|]+)(?:\|([^}]*))?\}\}/g, (m, slug, label) =>
+      (LINK_RESOLVER ? LINK_RESOLVER(slug.trim(), (label || slug).trim()) : (label || slug).trim()))
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -35,6 +41,13 @@ const BOLD_ONLY = /^\*\*(.+)\*\*$/;
 function render(md, opts) {
   const options = opts || {};
   const product = options.product || ((id) => `<!-- product not found: ${esc(id)} -->`);
+  const ranking = options.ranking || (() => '');
+  LINK_RESOLVER = options.link || null;
+  const pendingLinks = [];
+  if (!options.link) {
+    // 解決先が渡されていないときは、リンク待ちとして記録だけしておきます
+    LINK_RESOLVER = (slug, label) => { pendingLinks.push({ slug, label }); return esc(label); };
+  }
 
   const src = String(md || '')
     .replace(/<!--[\s\S]*?-->/g, '')      // 公開前チェックなどのコメントは落とす
@@ -45,6 +58,7 @@ function render(md, opts) {
   let i = 0;
   let boldSinceHeading = 0;   // 見出しからあとに出てきた太字だけの行の数
   let inProductSection = false;
+  let inFaq = false;
   let pendingAnchor = null;
   let idSeq = 0;
   const usedIds = new Set();
@@ -89,12 +103,19 @@ function render(md, opts) {
     const pm = line.match(/^\{\{product:([A-Za-z0-9_-]+)\}\}$/);
     if (pm) { push(product(pm[1])); i++; continue; }
 
+    // 各モールの検索結果へのリンク（記事末の「ほかの商品も見る」欄）
+    const rm = line.match(/^\{\{ranking:(.+)\}\}$/);
+    if (rm) { push(ranking(rm[1].trim())); i++; continue; }
+
     // 見出し
     let m = line.match(/^(#{1,4})\s+(.*)$/);
     if (m) {
       const lv = m[1].length;
       if (lv === 1) { pendingAnchor = null; i++; continue; }  // h1 は記事タイトルを使う
-      if (lv === 2) inProductSection = /おすすめ.*選/.test(m[2]);
+      if (lv === 2) {
+        inProductSection = /おすすめ.*選/.test(m[2]);
+        inFaq = /よくある質問|Q&A|FAQ/i.test(m[2]);
+      }
       if (lv >= 3) boldSinceHeading = 0;
       const text = m[2].trim();
       const auto = lv === 3 ? autoId[text] : null;
@@ -103,7 +124,8 @@ function render(md, opts) {
         || (lv <= 3 ? uniqueId(autoHeadingId(++idSeq)) : null);
       if (anchor) usedIds.add(anchor);
       const idAttr = anchor ? ` id="${anchor}"` : '';
-      push(`<h${lv}${idAttr}>${inline(text)}</h${lv}>`);
+      const cls = (lv === 3 && inFaq) ? ' class="faq-q"' : '';
+      push(`<h${lv}${idAttr}${cls}>${inline(text)}</h${lv}>`);
       if (lv <= 3 && anchor) headings.push({ level: lv, text: text.replace(/\*\*/g, ''), id: anchor });
       pendingAnchor = null;
       i++; continue;
@@ -230,42 +252,21 @@ function render(md, opts) {
     if (i === start) { push(inline(line)); i++; }
   }
 
-  return { html: out.join('\n'), headings, toc: buildToc(headings) };
+  LINK_RESOLVER = null;
+  return { html: out.join('\n'), headings, toc: buildToc(headings), pendingLinks };
 }
 
 // 目次を組み立てる。
 // Table of Contents Plus と同じHTML構造にしてあるので、
 // 追加CSS（#toc_container / ul.toc_list / .toc_number …）がそのまま効きます。
 function buildToc(headings) {
-  const items = headings.filter((h) => h.level === 2 || h.level === 3);
+  // 目次に出すのは h2 だけ。h3まで出すと項目が多すぎて、目次として機能しなくなります。
+  const items = headings.filter((h) => h.level === 2);
   if (items.length < 2) return '';
 
-  let html = '';
-  let openSub = false;
-  let h2n = 0;
-  let h3n = 0;
-  let openLi = false;
-
-  items.forEach((h) => {
-    if (h.level === 2) {
-      if (openSub) { html += '</ul>'; openSub = false; }
-      if (openLi) { html += '</li>'; }
-      h2n++; h3n = 0;
-      html += `<li><a href="#${h.id}"><span class="toc_number toc_depth_1">${h2n}</span> ${esc(h.text)}</a>`;
-      openLi = true;
-    } else {
-      if (!openLi) {   // h3 から始まっている場合の保険
-        h2n++;
-        html += `<li>`;
-        openLi = true;
-      }
-      if (!openSub) { html += '<ul>'; openSub = true; }
-      h3n++;
-      html += `<li><a href="#${h.id}"><span class="toc_number toc_depth_2">${h2n}.${h3n}</span> ${esc(h.text)}</a></li>`;
-    }
-  });
-  if (openSub) html += '</ul>';
-  if (openLi) html += '</li>';
+  const html = items.map((h, i) =>
+    `<li><a href="#${h.id}"><span class="toc_number toc_depth_1">${i + 1}</span> ${esc(h.text)}</a></li>`
+  ).join('');
 
   return '<div id="toc_container">'
     + '<p class="toc_title">目次 <span class="toc_toggle">[<a href="#" role="button">非表示</a>]</span></p>'

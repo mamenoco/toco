@@ -130,9 +130,43 @@ function renderHome() {
   $('#homeWorking').querySelectorAll('[data-open]').forEach((b) =>
     b.addEventListener('click', () => openProject(b.dataset.open)));
 
+  renderPending();
+
   $('#homeNoteItem').innerHTML = STATE.inventory.length
     ? STATE.inventory.map((i) => `<option value="${i.id}">${esc(i.name)}</option>`).join('')
     : '<option value="">（持ちもの台帳が空です）</option>';
+}
+
+// ---- リンク待ち ----
+async function renderPending() {
+  let r;
+  try { r = await api('links/pending'); } catch (e) { return; }
+  const list = r.links;
+  const missing = list.filter((x) => x.status === 'missing');
+  $('#pendCount').textContent = missing.length ? missing.length + '件' : 'なし';
+
+  $('#pendList').innerHTML = list.length ? '<table class="tbl"><tbody>'
+    + list.map((x, i) => `<tr>
+      <td class="t">${esc(x.labels.join(' / '))}
+        <div class="note" style="margin:2px 0 0">/${esc(x.slug)}/　${esc(x.usedIn.map((u) => u.title).join('、').slice(0, 40))} で使用</div></td>
+      <td class="r">${x.status === 'published' ? '<span class="tag ok">リンク済み</span>'
+        : x.status === 'draft' ? '<span class="tag warn">下書きあり</span>'
+        : `<button class="ghost" data-idea="${i}">記事ネタに追加</button>`}</td>
+    </tr>`).join('') + '</tbody></table>'
+    : '<p class="note">いまはありません。</p>';
+
+  $('#pendList').querySelectorAll('[data-idea]').forEach((b) => b.addEventListener('click', async () => {
+    const x = list[Number(b.dataset.idea)];
+    const r2 = await api('links/to-idea', {
+      slug: x.slug, label: x.labels[0],
+      title: `うさぎの${x.labels[0]}のおすすめ`,
+      keyword: `うさぎ ${x.labels[0]}`,
+      from: x.usedIn[0] ? x.usedIn[0].title : '',
+    });
+    await refresh();
+    renderPending();
+    toast(r2.already ? 'すでに記事ネタにあります' : `「${x.labels[0]}」を記事ネタに追加しました`);
+  }));
 }
 
 function stat(k, v, unit) {
@@ -416,6 +450,70 @@ $('#btnSearch').addEventListener('click', async () => {
   } catch (e) { $('#searchNote').textContent = ''; }
 });
 
+// ---- 候補の自動選出 ----
+$('#btnCurate').addEventListener('click', async () => {
+  const kw = $('#searchKeyword').value.trim();
+  if (!kw) return toast('キーワードを入れてください');
+  $('#searchResults').innerHTML = '';
+  $('#curateBox').innerHTML = '';
+  $('#searchNote').innerHTML = '<span class="spin"></span>楽天を調べています（10〜20秒かかります）…';
+  let r;
+  try { r = await api('search/curate', { keyword: kw, want: 10 }); }
+  catch (e) { $('#searchNote').textContent = ''; return; }
+
+  $('#searchNote').textContent =
+    `検索 ${r.searched}件（企画ものを除外 ${r.skipped}件）→ 同じ商品をまとめて ${r.unique}商品 → 候補 ${r.candidates.length}点`;
+
+  CURATED = r.candidates;
+  $('#curateBox').innerHTML = `
+    <p class="note">記事に載せるものにチェックを入れてください。<b>6〜7点</b>が目安です。
+      価格帯とサイズが散るように選ぶと、比較記事として読みやすくなります。</p>
+    <div class="list">${r.candidates.map((c, i) => `
+      <div class="item">
+        <img src="${esc(c.image)}" alt="">
+        <div class="body">
+          <div class="nm"><label style="margin:0;display:flex;gap:9px;align-items:flex-start;border:0;padding:0;background:none">
+            <input type="checkbox" data-pick="${i}" style="width:auto;margin:4px 0 0">
+            <span>${esc(c.name)}</span></label></div>
+          <div class="mt">${c.price ? c.price.toLocaleString() + '円' : '価格不明'}　★${c.reviewAverage || '-'}
+            ${c.owned ? '<span class="badge own">持ちもの台帳にあり</span>' : ''}</div>
+          <div class="mt" style="color:var(--pink-dark)">${esc(c.reason)}</div>
+          <div class="acts"><a class="mt" href="${esc(c.url)}" target="_blank" rel="noopener">楽天の商品ページ ↗</a></div>
+        </div>
+      </div>`).join('')}</div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnAddPicked">選んだ商品をこの記事に追加</button>
+      <span class="note" id="pickCount">0点を選択中</span>
+    </div>`;
+
+  const update = () => {
+    const n = $('#curateBox').querySelectorAll('[data-pick]:checked').length;
+    $('#pickCount').textContent = n + '点を選択中'
+      + (n >= 6 && n <= 7 ? '（ちょうどよい点数です）' : n > 8 ? '（少し多いかもしれません）' : '');
+  };
+  $('#curateBox').querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('change', update));
+
+  $('#btnAddPicked').addEventListener('click', async () => {
+    const idx = [...$('#curateBox').querySelectorAll('[data-pick]:checked')].map((b) => Number(b.dataset.pick));
+    if (!idx.length) return toast('商品にチェックを入れてください');
+    const add = idx.map((i) => {
+      const c = CURATED[i];
+      return {
+        id: Math.random().toString(36).slice(2),
+        name: c.name, shop: c.shop, url: c.url, code: c.code, price: c.price,
+        image: c.image, reviewCount: c.totalReviews, reviewAverage: c.reviewAverage,
+        caption: c.caption || '', specs: {}, reviewText: '', reviewUrl: '',
+        owned: !!c.owned,
+      };
+    });
+    await saveProject({ products: (CURRENT.products || []).concat(add) });
+    $('#curateBox').innerHTML = '';
+    $('#searchNote').textContent = '';
+    renderPicked(); renderReviewStep();
+    toast(add.length + '点を追加しました');
+  });
+});
+
 $('#btnManualAdd').addEventListener('click', () => {
   modal(`<h3>手入力で商品を追加</h3>
     <p class="note">検索で出てこない商品や、Amazon限定の商品に使ってください。</p>
@@ -559,6 +657,7 @@ $('#btnOpenPreview').addEventListener('click', async () => {
   window.open(STATE.site.previewUrl + CURRENT.slug + '/', '_blank');
 });
 
+let CURATED = [];
 let AI_JOB = null, AI_TIMER = null;
 
 function aiBusy(on, label) {

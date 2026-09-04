@@ -380,17 +380,19 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 }
 
 /* --- 各セクションの結論の1文（選び方など） --- */
+/* 見出しに見えないよう、文字の幅ぶんだけ色を敷きます。
+   段落なので block ですが、inline-block にすると中身の幅に縮みます。 */
 .entry-content .lead {
-  margin: 0 0 1.2em;
-  padding: 12px 16px;
-  border-left: 3px solid var(--gold);
-  border-radius: 0 10px 10px 0;
-  background: #fffdf7;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 1.5em;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--pink-soft);
   color: var(--ink);
-  font-family: "Zen Maru Gothic", sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 @media (max-width: 600px) {
   .entry-content .lead { padding: 10px 13px; font-size: 14px; }
@@ -400,4 +402,7 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 .entry-content h2[id],.entry-content h3[id]{scroll-margin-top:140px}
 @media(max-width:900px){.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:80px}}
 .contact-form{margin:24px 0}.contact-form iframe{width:100%;border:0;border-radius:12px;background:#fff}
+.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}
+.link-todo{color:inherit}
+.entry-content h3.faq-q::before{content:"Q. ";color:var(--pink-dark);font-weight:700}
 .pd-box{display:flex;gap:18px;margin:26px 0;padding:20px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 4px 16px rgba(90,68,59,.05)}.pd-img{flex:0 0 132px}.pd-img img{width:132px;height:132px;object-fit:contain;border-radius:8px;background:#fdfaf7}.pd-body{min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center}.pd-brand{margin:0 0 2px;color:#a3968f;font-size:11px;letter-spacing:.04em}.pd-name{margin:0 0 14px;font-family:"Zen Maru Gothic",sans-serif;font-size:15px;font-weight:700;line-height:1.6}.pd-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.pd-btn{display:grid;place-items:center;height:42px;border-radius:999px;color:#fff!important;font-size:13px;font-weight:700;text-decoration:none!important;letter-spacing:.02em;box-shadow:0 4px 10px rgba(120,90,70,.13);transition:transform .15s ease,filter .15s ease}.pd-btn:hover{transform:translateY(-1px);filter:brightness(1.05)}.pd-amazon{background:#f79256}.pd-rakuten{background:#f76956}.pd-yahoo{background:#7b9fd4}.pd-note{margin:11px 0 0;color:#a3968f;font-size:10px;line-height:1.6}@media(max-width:600px){.pd-box{flex-direction:column;gap:14px;padding:16px;align-items:center;text-align:center}.pd-img{flex:none}.pd-body{width:100%}.pd-name{font-size:14px}.pd-btns{grid-template-columns:1fr 1fr}}

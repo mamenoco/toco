@@ -240,6 +240,12 @@ function buildAssets() {
       '.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:140px}',
       '@media(max-width:900px){.entry-content h2[id],.entry-content h3[id]{scroll-margin-top:80px}}',
       '.contact-form{margin:24px 0}.contact-form iframe{width:100%;border:0;border-radius:12px;background:#fff}',
+      // 記事末の「ほかの商品も見る」欄
+      '.mall-links{margin:26px 0;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}',
+      // まだ書いていない記事へのリンク（読者には普通の文字として見えます）
+      '.link-todo{color:inherit}',
+      // よくある質問の見出し
+      '.entry-content h3.faq-q::before{content:"Q. ";color:var(--pink-dark);font-weight:700}',
       // 商品カード
       [
         '.pd-box{display:flex;gap:18px;margin:26px 0;padding:20px;border:1px solid var(--line);',
@@ -339,10 +345,50 @@ function buildAssets() {
 
 // ---------- 各ページ ----------
 
+// 記事末の「ほかの商品も見る」欄。
+// 商品ページ以外へのリンクでも、そこから購入されれば紹介料の対象になります。
+function rankingLinks(keyword, ctx) {
+  const malls = [
+    ['amazon', 'Amazonで探す', 'https://www.amazon.co.jp/s?k=' + encodeURIComponent(keyword)],
+    ['rakuten', '楽天市場で探す', 'https://search.rakuten.co.jp/search/mall/' + encodeURIComponent(keyword) + '/'],
+  ];
+  if (config.showYahoo) {
+    malls.push(['yahoo', 'Yahoo!ショッピングで探す',
+      'https://shopping.yahoo.co.jp/search?p=' + encodeURIComponent(keyword)]);
+  }
+  const buttons = malls.map(([mall, label, url]) => {
+    const href = affiliate.link(mall, url, ctx.moshimo);
+    if (!href) return '';
+    return '<a class="pd-btn pd-' + mall + '" href="' + esc(href) + '"'
+      + ' target="_blank" rel="nofollow sponsored noopener" data-mall="' + mall + '">'
+      + esc(label) + '</a>';
+  }).filter(Boolean).join('');
+  if (!buttons) return '';
+  return '<div class="mall-links"><div class="pd-btns">' + buttons + '</div>'
+    + '<p class="pd-note">「' + esc(keyword) + '」の検索結果が開きます。'
+    + '掲載していない商品も探せます。</p></div>';
+}
+
+// ---- まだ書いていない記事へのリンク ----
+// 記事ができていればリンクになり、無ければ文字のまま出ます。
+function makeLinkResolver(ctx) {
+  return (slug, label) => {
+    const a = ctx.bySlug[slug];
+    if (a && a.status === 'publish') {
+      return '<a href="/' + esc(slug) + '/">' + esc(label) + '</a>';
+    }
+    return '<span class="link-todo" title="記事ができたらリンクになります">' + esc(label) + '</span>';
+  };
+}
+
 function buildSingle(a, prev, next, ctx) {
   const cat = categoryOf(a.category);
   const md = replaceLegacyProductLines(a.body);
-  const r = markdown.render(md, { product: (id) => productCard(id, ctx) });
+  const r = markdown.render(md, {
+    product: (id) => productCard(id, ctx),
+    ranking: (kw) => rankingLinks(kw, ctx),
+    link: makeLinkResolver(ctx),
+  });
 
   const hero = a.eyecatch
     ? `<figure class="single-hero"><img src="${esc(a.eyecatch)}" alt=""></figure>` : '';
@@ -384,7 +430,11 @@ function contactForm() {
 }
 
 function buildPage(p, ctx) {
-  const r = markdown.render(p.body, { product: (id) => productCard(id, ctx) });
+  const r = markdown.render(p.body, {
+    product: (id) => productCard(id, ctx),
+    ranking: (kw) => rankingLinks(kw, ctx),
+    link: makeLinkResolver(ctx),
+  });
   let body = r.html.replace(/\{\{contact-form\}\}/g, () => contactForm());
   // 目次は記事と同じく、最初の見出しの直前に置きます
   if (r.toc) {
@@ -524,6 +574,9 @@ function build(opts) {
   const all = loadMarkdownDir(ARTICLES, 'article');
   const published = all.filter((a) => a.status === 'publish')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  ctx.bySlug = {};
+  all.forEach((a) => { ctx.bySlug[a.slug] = a; });
 
   published.forEach((a, i) => buildSingle(a, published[i + 1], published[i - 1], ctx));
 

@@ -34,6 +34,7 @@ const siteConfig = require('./lib/site-config.js');
 const affiliate = require('./lib/affiliate.js');
 const products = require('./lib/products.js');
 const curate = require('./lib/curate.js');
+const links = require('./lib/links.js');
 const preview = require('./lib/preview-server.js');
 const fal = require('./lib/fal.js');
 const stamps = require('./lib/stamps.js');
@@ -361,6 +362,7 @@ const server = http.createServer(async (req, res) => {
       if (!idea) return send(res, 200, { error: '記事ネタが見つかりません' });
       const pr = newProject(db, {
         title: idea.title, keyword: idea.keyword, category: idea.category,
+        slug: idea.slug || '',
         ideaId: idea.id, ideaNote: idea.note || '',
       });
       idea.status = '作成中';
@@ -407,6 +409,30 @@ const server = http.createServer(async (req, res) => {
       DB.saveDb(db);
       if (gone && gone.slug && body.deleteArticle) articles.remove(gone.slug);
       return send(res, 200, { ok: true });
+    }
+
+    // ===== 記事内リンクの待ち行列 =====
+    // 本文の {{link:スラッグ|文字}} を集めて、まだ書いていない記事を一覧にします。
+    if (p === '/api/links/pending') {
+      return send(res, 200, { links: links.scan() });
+    }
+
+    // リンク待ちを記事ネタに登録する
+    if (p === '/api/links/to-idea') {
+      db.ideas = db.ideas || DB.seedIdeas();
+      const exists = db.ideas.find((x) => x.slug === body.slug);
+      if (exists) return send(res, 200, { ok: true, ideas: db.ideas, already: true });
+      db.ideas.push({
+        id: DB.newId(),
+        title: body.title || body.label || body.slug,
+        keyword: body.keyword || body.label || body.slug,
+        slug: body.slug,
+        category: body.category || '',
+        priority: '高', note: `「${body.from || ''}」からリンク待ち`,
+        status: '未着手', projectId: null,
+      });
+      DB.saveDb(db);
+      return send(res, 200, { ok: true, ideas: db.ideas });
     }
 
     // ===== 記事ファイル =====

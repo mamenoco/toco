@@ -40,6 +40,11 @@
       <div id="homeWorking"></div>
     </div>
     <div class="card">
+      <h3>リンク待ち <span class="tag" id="pendCount"></span></h3>
+      <p class="note">本文で触れているのに、まだ記事が無いものです。記事を書いて公開すると、自動でリンクに変わります。</p>
+      <div id="pendList"></div>
+    </div>
+    <div class="card">
       <h3>気づいたことをメモ</h3>
       <p class="note">思いついたときに書き足しておくと、記事を書くときの材料になります。</p>
       <label>どの用品について<select id="homeNoteItem"></select></label>
@@ -93,14 +98,17 @@
   <!-- ステップ1 -->
   <div class="stepbox" data-box="1">
     <div class="card">
-      <h3>楽天で商品を探す</h3>
-      <p class="note">レビュー件数の多い順に並びます。持ちもの台帳にある商品には印が付きます。</p>
+      <h3>商品を探す</h3>
+      <p class="note">「候補を自動で選ぶ」を押すと、楽天を60件ぶん調べて、同じ商品をまとめたうえで
+        口コミ数・評価・価格帯のばらつきから10点前後に絞ります。そこから6〜7点を選んでください。</p>
       <div class="inline">
-        <label>キーワード<input id="searchKeyword" placeholder="うさぎ ケージ"></label>
-        <button class="primary" id="btnSearch">検索</button>
+        <label>キーワード<input id="searchKeyword" placeholder="うさぎ 牧草"></label>
+        <button class="primary" id="btnCurate">候補を自動で選ぶ</button>
+        <button class="ghost" id="btnSearch">ふつうに検索</button>
         <button class="ghost" id="btnManualAdd">手入力で追加</button>
       </div>
       <p class="note" id="searchNote"></p>
+      <div id="curateBox"></div>
       <div id="searchResults" class="list"></div>
     </div>
     <div class="card">

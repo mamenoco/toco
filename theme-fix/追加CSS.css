@@ -346,17 +346,19 @@ div#toc_container ul.toc_list ul .toc_number { color: #c3b3a8; font-weight: 400;
 }
 
 /* --- 各セクションの結論の1文（選び方など） --- */
+/* 見出しに見えないよう、文字の幅ぶんだけ色を敷きます。
+   段落なので block ですが、inline-block にすると中身の幅に縮みます。 */
 .entry-content .lead {
-  margin: 0 0 1.2em;
-  padding: 12px 16px;
-  border-left: 3px solid var(--gold);
-  border-radius: 0 10px 10px 0;
-  background: #fffdf7;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 1.5em;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--pink-soft);
   color: var(--ink);
-  font-family: "Zen Maru Gothic", sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 @media (max-width: 600px) {
   .entry-content .lead { padding: 10px 13px; font-size: 14px; }

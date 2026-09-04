@@ -19,8 +19,26 @@ const NOISE = [
 ];
 const SIZE_HINT = /(\d{2,3})\s*(cm|センチ)/;
 
+// 記事に載せる名前として使えるよう、宣伝文句や飾りを落とします。
+// 「◆令和8年度産新刈り◆【送料無料】牧草市場 スーパープレミアム…」→「牧草市場 スーパープレミアム…」
+function cleanName(name) {
+  let s = String(name || '')
+    .replace(/◆[^◆]{0,20}◆/g, ' ')
+    .replace(/【[^】]{0,24}】/g, ' ')
+    .replace(/\([^)]{0,10}(送料|ポイント|クーポン)[^)]{0,10}\)/g, ' ')
+    .replace(/[★☆◇■●▲♪]/g, ' ');
+  NOISE.forEach((w) => { s = s.split(w).join(' '); });
+  return s.replace(/[　\s]+/g, ' ').replace(/^[\s・,、/|]+/, '').trim().slice(0, 60);
+}
+
+// 「一番刈り」と「1番刈り」のような表記ゆれをそろえます。
+// 同じ商品なのに別物と数えてしまうのを防ぐためです。
+const KANJI_NUM = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7', 八: '8', 九: '9' };
+
 function normalize(name) {
   let s = String(name || '')
+    .replace(/[一二三四五六七八九](?=番)/g, (c) => KANJI_NUM[c])
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[【】\[\]（）()《》〈〉]/g, ' ')
     .replace(/[!！?？★☆◆■●▲♪]/g, ' ')
     .replace(/[　\s]+/g, ' ')
@@ -29,27 +47,65 @@ function normalize(name) {
   return s.replace(/\s+/g, ' ').trim();
 }
 
-// 商品を見分けるための語のあつまり
+// 商品を見分けるための手がかり。
+// 日本語の商品名はスペースで区切られていないことが多く、単語では比べられません。
+// そこで「隣り合う2文字」の集合どうしを比べます（2-gram）。
+//   「チモシー1番刈り」→ チモ, モシ, シー, ー1, 1番, 番刈, 刈り
 function tokens(name) {
-  return new Set(normalize(name).toLowerCase()
-    .split(/[\s・,、/／|｜]+/)
-    .filter((t) => t.length >= 2 && !/^\d+$/.test(t)));
+  // 「3kg」「1.5kg」「500g×6パック」などは商品を分ける手がかりにしません。
+  // 同じ商品のサイズ違いを別物と数えてしまうためです。
+  const s = normalize(name).toLowerCase()
+    .replace(/\d+(?:\.\d+)?\s*(kg|ｋｇ|g|ｇ|l|ml|cm|センチ|袋|パック|個|入)/g, ' ')
+    .replace(/[×x]\s*\d+/g, ' ')
+    .replace(/\d+/g, ' ')
+    .replace(/[\s・,、/／|｜]/g, '');
+  const set = new Set();
+  for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+  return set;
 }
 
-function similarity(a, b) {
+// 内容量・サイズの表記を拾う（同じ商品のサイズ違いをまとめるため）
+function sizeOf(name) {
+  const m = String(name).match(/(\d+(?:\.\d+)?)\s*(kg|g|ｇ|ｋｇ|l|ml|cm|センチ)/i);
+  return m ? m[1] + m[2].toLowerCase() : '';
+}
+
+function overlapCount(a, b) {
   let hit = 0;
   a.forEach((t) => { if (b.has(t)) hit++; });
+  return hit;
+}
+
+// 重なりの割合（Jaccard）。名前の長さが近いときに向きます。
+function similarity(a, b) {
+  const hit = overlapCount(a, b);
   const union = a.size + b.size - hit;
   return union ? hit / union : 0;
 }
 
-// 同じ商品とみなす条件：語の重なりが十分あり、価格帯も近いこと
+// 短いほうがどれだけ長いほうに含まれるか。
+// 「◯◯チモシー 3kg」と「◯◯チモシー（うさぎ・モルモットなどの牧草）」のように
+// 片方だけ説明が長い場合でも、同じ商品だと分かります。
+function containment(a, b) {
+  const min = Math.min(a.size, b.size);
+  return min ? overlapCount(a, b) / min : 0;
+}
+
+// 同じ商品とみなす条件
+//   ・名前がとてもよく似ている（0.72以上）→ 価格が違っても同じ商品のサイズ違いとみなす
+//   ・そこそこ似ている（0.55以上）→ 価格帯も近ければ同じ商品（ショップ違い）
 function sameProduct(x, y) {
+  // 短いほうの名前が十分に短いと、偶然の一致で誤ってまとめてしまいます
+  const shortest = Math.min(x._tokens.size, y._tokens.size);
+  if (shortest < 8) return false;
+
   const sim = similarity(x._tokens, y._tokens);
+  if (sim >= 0.72) return true;
+  if (containment(x._tokens, y._tokens) >= 0.82) return true;
   if (sim < 0.55) return false;
   const px = Number(x.price) || 0;
   const py = Number(y.price) || 0;
-  if (!px || !py) return sim >= 0.7;
+  if (!px || !py) return false;
   const ratio = Math.min(px, py) / Math.max(px, py);
   return ratio >= 0.7;
 }
@@ -70,9 +126,13 @@ function dedupe(items) {
       (Number(b.reviewCount) || 0) - (Number(a.reviewCount) || 0))[0];
     const totalReviews = g.members.reduce((n, m) => n + (Number(m.reviewCount) || 0), 0);
     const prices = g.members.map((m) => Number(m.price) || 0).filter(Boolean);
+    const sizes = [...new Set(g.members.map((m) => sizeOf(m.name)).filter(Boolean))];
     return Object.assign({}, rep, {
+      name: cleanName(rep.name),
+      rawName: rep.name,
       shopCount: g.members.length,
       totalReviews,
+      sizes,
       priceMin: prices.length ? Math.min(...prices) : 0,
       priceMax: prices.length ? Math.max(...prices) : 0,
     });
@@ -151,22 +211,29 @@ function reasonFor(x, band) {
   else bits.push('口コミなし');
   if (Number(x.reviewAverage) >= 4.5) bits.push('評価が高い');
   bits.push(`価格帯は${band}`);
-  if (x.shopCount >= 3) bits.push(`${x.shopCount}店舗で扱いあり`);
+  if (x.shopCount >= 3) bits.push(`${x.shopCount}件が同一商品`);
+  if (x.sizes && x.sizes.length >= 2) bits.push(`容量は${x.sizes.slice(0, 4).join('・')}`);
   const m = String(x.name).match(SIZE_HINT);
   if (m) bits.push(`幅${m[1]}cm前後`);
   return bits.join('・');
 }
 
+// 記事で紹介するのに向かない出品。
+// 中身が確定しないもの、期間限定の企画ものは候補から外します。
+const SKIP = /(抽選|当選|福袋|くじ|訳あり|わけあり|アウトレット|お一人様|中古|ジャンク|開店|閉店セール)/;
+
 // まとめて実行
 function curate(items, opts) {
   const o = opts || {};
   const want = o.want || 10;
-  const grouped = dedupe(items);
+  const usable = items.filter((x) => !SKIP.test(String(x.name)));
+  const grouped = dedupe(usable);
   const scored = score(grouped);
   const picked = diversify(scored, want, o.inventory);
   return {
     candidates: picked.map((x) => { const y = Object.assign({}, x); delete y._tokens; delete y._score; return y; }),
     searched: items.length,
+    skipped: items.length - usable.length,
     unique: grouped.length,
   };
 }
