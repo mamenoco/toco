@@ -14,6 +14,11 @@ const { execFileSync } = require('child_process');
 const QUEUE = 'https://queue.fal.run';
 
 // モデルは fal 側で入れ替わります。合わなくなったら https://fal.ai/models で確認してください。
+// 商品画像を参照して作るときのモデル。
+// 参照した商品の形をそのまま残したまま、周りの場面だけを作り替えてくれます。
+// 1枚あたりの費用は文章だけの生成より高めです（数十倍）。
+const REFERENCE_MODEL = 'fal-ai/flux-pro/kontext';
+
 const MODELS = [
   { id: 'fal-ai/flux/schnell', label: 'FLUX schnell（速い・安い）',
     note: '10秒ほど。下書きや量産に向いています' },
@@ -70,15 +75,16 @@ async function generate(key, opts) {
   const parts = [subject, o.noAnimals === false ? '' : NO_ANIMALS, style].filter(Boolean);
   const prompt = parts.join('. ');
 
-  // 1200×630 に近い比率で作り、あとで正確に切り抜きます
-  const input = {
-    prompt,
-    image_size: { width: 1216, height: 640 },
-    num_images: 1,
-    enable_safety_checker: true,
-  };
+  // 商品画像を渡されたら、その形を保ったまま場面を作り替えるモデルに切り替えます
+  const useRef = !!o.referenceDataUri;
+  const model2 = useRef ? REFERENCE_MODEL : model;
 
-  const sub = await fetch(`${QUEUE}/${model}`, {
+  // 1200×630 に近い比率で作り、あとで正確に切り抜きます
+  const input = useRef
+    ? { prompt, image_url: o.referenceDataUri, aspect_ratio: '16:9' }
+    : { prompt, image_size: { width: 1216, height: 640 }, num_images: 1, enable_safety_checker: true };
+
+  const sub = await fetch(`${QUEUE}/${model2}`, {
     method: 'POST', headers: headers(key, true), body: JSON.stringify(input),
   });
   const subJson = await readJson(sub);
@@ -112,7 +118,7 @@ async function generate(key, opts) {
 
   const img = await fetch(url);
   if (!img.ok) throw new Error(`画像のダウンロードに失敗しました（${img.status}）`);
-  return { buffer: Buffer.from(await img.arrayBuffer()), prompt, model };
+  return { buffer: Buffer.from(await img.arrayBuffer()), prompt, model: model2, usedReference: useRef };
 }
 
 // エラーを、何をすればいいか分かる日本語にする
@@ -139,4 +145,15 @@ function saveAs(buffer, file) {
   return fs.statSync(file).size;
 }
 
-module.exports = { MODELS, DEFAULT_STYLE, NO_ANIMALS, generate, saveAs, findImageUrl };
+// ローカルの画像を fal に渡せる形にする
+function toDataUri(file) {
+  const ext = path.extname(file).toLowerCase();
+  const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[ext];
+  if (!mime) throw new Error('参照できるのは png / jpg / webp です');
+  return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+}
+
+module.exports = {
+  MODELS, DEFAULT_STYLE, NO_ANIMALS, REFERENCE_MODEL,
+  generate, saveAs, findImageUrl, toDataUri,
+};

@@ -5,6 +5,7 @@ category: toy
 tags: [トイレ, 初心者]
 date: 2026-09-04
 updated: 2026-09-04
+eyecatch: /assets/eyecatch/toilet.jpg
 status: draft
 ---
 # うさぎのトイレのおすすめ5選｜掃除しやすい形の選び方や固定のしかたまで詳しく紹介

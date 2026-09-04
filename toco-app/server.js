@@ -801,11 +801,25 @@ const server = http.createServer(async (req, res) => {
       // 日本語で書かれていたら、画像生成向けの英語に直してから送ります。
       // 翻訳は Claude Code に頼むので、追加の鍵や費用はかかりません。
       const t = await translate.toEnglish(body.prompt, settings.aiModel);
+
+      // 商品を参照するとき、その商品画像を読み込みます
+      let referenceDataUri = '';
+      if (body.productId) {
+        const prod = products.get(body.productId);
+        const img = prod && prod.image
+          ? path.join(ROOT, 'site', String(prod.image).replace(/^\//, '')) : '';
+        if (!img || !fs.existsSync(img)) {
+          return send(res, 200, { error: 'その商品の画像が見つかりませんでした。商品画面で画像を設定してください。' });
+        }
+        referenceDataUri = imageAI.toDataUri(img);
+      }
+
       const r = await imageAI.generate(settings.falKey, {
         prompt: t.english,
         model: body.model,
         style: settings.imageStyle || imageAI.DEFAULT_STYLE,
         noAnimals: body.noAnimals !== false,
+        referenceDataUri,
       });
       // 候補として履歴に残してから、いまのアイキャッチにします。
       // 履歴は _history に置きます。公開されるサイトには含まれません。
@@ -826,6 +840,7 @@ const server = http.createServer(async (req, res) => {
         ok: true, path: rel, kb: Math.round(size / 1024),
         promptJa: t.translated ? String(body.prompt).trim() : '',
         promptEn: t.english,
+        usedReference: !!r.usedReference,
       });
     }
 
@@ -875,6 +890,34 @@ const server = http.createServer(async (req, res) => {
         if (fs.existsSync(f)) fs.unlinkSync(f);
       });
       return send(res, 200, { ok: true });
+    }
+
+    if (p === '/api/eyecatch/references') {
+      const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
+      if (!pr) return send(res, 200, { items: [] });
+      const master = products.load();
+      const ids = new Set();
+
+      // 本文に置いた {{product:…}} がいちばん確かな手がかりです
+      const md = bodyOf(pr) || '';
+      let m;
+      const re = /\{\{product:([^}]+)\}\}/g;
+      while ((m = re.exec(md))) ids.add(m[1].trim());
+
+      // 本文がまだ無いときは、選んだ商品から探します
+      (pr.products || []).forEach((x) => {
+        const hit = master.find((y) =>
+          (x.masterId && y.id === x.masterId)
+          || (x.code && y.rakuten && y.rakuten.itemCode === x.code));
+        if (hit) ids.add(hit.id);
+      });
+
+      const items = [...ids]
+        .map((id) => master.find((y) => y.id === id))
+        .filter((y) => y && y.image
+          && fs.existsSync(path.join(ROOT, 'site', String(y.image).replace(/^\//, ''))))
+        .map((y) => ({ id: y.id, name: y.name, image: y.image }));
+      return send(res, 200, { items });
     }
 
     if (p === '/api/eyecatch/models') {

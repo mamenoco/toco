@@ -290,11 +290,13 @@
           <button class="ghost" data-tpl="hay">牧草・ごはん</button>
           <button class="ghost" data-tpl="room">うさぎのいる部屋（うさぎは描かない）</button>
         </div>
+        <div id="eyeRefBox" style="margin:14px 0"></div>
+
         <label>どんな絵にしますか
           <textarea id="eyePrompt" rows="3"
             placeholder="木の床に置かれた白い陶器のボウルに入った乾燥牧草と、そばに置かれた小さなかご"></textarea></label>
         <div class="inline">
-          <label>モデル<select id="eyeModel"></select></label>
+          <label id="eyeModelWrap">モデル<select id="eyeModel"></select></label>
           <button class="primary" id="btnEyeGen">この内容で作る</button>
         </div>
         <p class="note" id="eyeGenNote"></p>
