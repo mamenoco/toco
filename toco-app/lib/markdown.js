@@ -32,9 +32,10 @@ function inline(t) {
       if (r && r.card) LINK_CARDS.push(r.card);
       return (r && r.html) || l;
     })
+    // ==テキスト== でマーカー。リンク記法をまたぐこともあるので、いちばん先に処理します。
+    // 後回しにすると、置き換えたHTMLの中の = と衝突して効かなくなります。
+    .replace(/==([^\n]+?)==/g, '<mark class="hl">$1</mark>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    // ==テキスト== でマーカー。本文中の目立たせたい一文に使います。
-    .replace(/==([^=\n]+)==/g, '<mark class="hl">$1</mark>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
@@ -50,8 +51,15 @@ const BOLD_ONLY = /^\*\*(.+)\*\*$/;
 
 // render(md, opts) → { html, toc, headings }
 //   opts.product(id) … {{product:xxx}} を置き換えるHTMLを返す関数
+// 出力したHTMLの最初のタグに data-ln="開始行,終了行" を足します。
+// 画面のプレビューから「本文のどこを直せばよいか」を引けるようにするためです。
+function withLine(html, from, to) {
+  return String(html).replace(/^(\s*<[a-zA-Z][a-zA-Z0-9]*)/, `$1 data-ln="${from},${to}"`);
+}
+
 function render(md, opts) {
   const options = opts || {};
+  const trackSource = !!options.trackSource;
   const product = options.product || ((id) => `<!-- product not found: ${esc(id)} -->`);
   const ranking = options.ranking || (() => '');
   LINK_RESOLVER = options.link || null;
@@ -86,8 +94,9 @@ function render(md, opts) {
   let autoSeq = 0;
 
   // 直前の行に記事カードが溜まっていれば、その行のすぐ下に出します。
+  let blockStart = 0;
   const push = (html) => {
-    out.push(html);
+    out.push(trackSource ? withLine(html, blockStart, Math.max(blockStart, i - 1)) : html);
     if (LINK_CARDS.length) {
       out.push('<div class="rel-cards">' + LINK_CARDS.join('') + '</div>');
       LINK_CARDS = [];
@@ -110,6 +119,7 @@ function render(md, opts) {
   };
 
   while (i < lines.length) {
+    blockStart = i;
     const raw = lines[i];
     const line = raw.trim();
 

@@ -984,7 +984,23 @@ async function renderPreview(opts) {
     <link rel="stylesheet" href="/preview.css">
     <style>body{margin:0;background:var(--cream,#fffaf6)}
       .wrap{max-width:820px;margin:0 auto;padding:28px 22px 60px;background:#fff}
-      ::selection{background:rgba(239,174,179,.45)}</style></head>
+      ::selection{background:rgba(239,174,179,.45)}
+      /* 編集できる場所が分かるように。公開されるページには出ません。 */
+      [data-ln]{position:relative;border-radius:6px;transition:background .12s}
+      [data-ln]:hover{background:#fffaf3;box-shadow:0 0 0 6px #fffaf3}
+      [data-ln]:hover::after{content:"ダブルクリックで編集";position:absolute;top:-9px;right:0;
+        padding:1px 7px;border-radius:99px;background:#e79aa2;color:#fff;font-size:10px;
+        font-weight:700;letter-spacing:.02em;white-space:nowrap}
+      /* リンク待ちの語。読者には普通の文字ですが、編集中は分かるようにします。 */
+      .link-todo{border-bottom:1px dashed #e0c9c4}
+      .edit-box{width:100%;box-sizing:border-box;padding:10px 12px;border:2px solid #e79aa2;
+        border-radius:8px;background:#fff;font:inherit;line-height:inherit;color:inherit;resize:none}
+      .edit-bar{display:flex;gap:8px;align-items:center;margin:6px 0 18px}
+      .edit-bar button{padding:5px 13px;border:1px solid #ebe2dc;border-radius:7px;background:#fff;
+        font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+      .edit-bar .ok{background:#e79aa2;border-color:#e79aa2;color:#fff}
+      .edit-bar small{color:#a3968f;font-size:11px}
+    </style></head>
     <body><div class="wrap"><div class="entry-content">${r.toc || ''}${r.html}</div></div></body></html>`;
   f.srcdoc = doc;
   f.onload = () => {
@@ -992,6 +1008,10 @@ async function renderPreview(opts) {
     d.addEventListener('selectionchange', updateMarkTools);
     d.addEventListener('mouseup', updateMarkTools);
     d.addEventListener('keyup', updateMarkTools);
+    d.addEventListener('dblclick', (e) => {
+      const b = e.target.closest && e.target.closest('[data-ln]');
+      if (b) openBlockEditor(b, d);
+    });
     if (keep) {
       // CSSと画像があとから読み込まれると文書の高さが変わり、
       // 一度だけ戻しても位置がずれます。狙った位置に着くまで繰り返します。
@@ -1012,6 +1032,37 @@ async function renderPreview(opts) {
 }
 $('#btnRenderPreview').addEventListener('click', () => renderPreview({ keepScroll: true }));
 
+// 本文（Markdown）の記法を展開して、表示される文字と本文の位置を対応づけます。
+//   {{link:hay-feeder|牧草入れ}} → 「牧草入れ」の4文字が、本文のどこにあたるか
+// これがないと、リンク記法をまたいで選んだときに場所を特定できません。
+function expandSource(src) {
+  const plain = [];
+  const map = [];
+  const tok = [];   // その文字が記法の内側なら、記法全体の範囲 {s, e}
+  let i = 0;
+  const take = (text, offset, span) => {
+    for (let k = 0; k < text.length; k++) {
+      plain.push(text[k]); map.push(i + offset + k); tok.push(span || null);
+    }
+  };
+  while (i < src.length) {
+    const rest = src.slice(i);
+    let m = /^\{\{link:([^}|]+)(?:\|([^}]*))?\}\}/.exec(rest);
+    if (m) {
+      const label = (m[2] != null ? m[2] : m[1]).trim();
+      take(label, m[0].indexOf(m[2] != null ? '|' : ':') + 1, { s: i, e: i + m[0].length });
+      i += m[0].length; continue;
+    }
+    m = /^\[([^\]]+)\]\([^)]*\)/.exec(rest);
+    if (m) { take(m[1], 1, { s: i, e: i + m[0].length }); i += m[0].length; continue; }
+    m = /^(\*\*|==)([^*=\n]+)\1/.exec(rest);
+    if (m) { take(m[2], m[1].length, { s: i, e: i + m[0].length }); i += m[0].length; continue; }
+    plain.push(src[i]); map.push(i); tok.push(null); i++;
+  }
+  return { plain: plain.join(''), map, tok };
+}
+
+// 選択されている場所を、本文の「何行目のどこ」まで特定します。
 function previewSelection() {
   const f = $('#previewFrame');
   const d = f && f.contentDocument;
@@ -1021,16 +1072,24 @@ function previewSelection() {
   const text = sel.toString().trim();
   if (!text || text.length < 2) return null;
 
-  // 選んだ位置が、本文の何番目の「同じ文字列」なのかを数えます。
-  // 同じ言い回しが複数あっても、狙った場所に付けられるようにするためです。
-  const range = d.createRange();
-  range.selectNodeContents(d.body);
-  range.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
-  const before = range.toString();
+  // 選択が入っているブロック（段落・見出しなど）を探します
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  const block = node.closest && node.closest('[data-ln]');
+  if (!block) return { text, block: null };
+
+  const [from, to] = block.getAttribute('data-ln').split(',').map(Number);
+
+  // ブロックの中で何番目の一致かを数えます（記事全体で数えるより確実です）
+  const r = d.createRange();
+  r.selectNodeContents(block);
+  r.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+  const before = r.toString();
   let occurrence = 0;
   let at = before.indexOf(text);
   while (at !== -1) { occurrence++; at = before.indexOf(text, at + 1); }
-  return { text, occurrence };
+
+  return { text, occurrence, from, to, block };
 }
 
 function updateMarkTools() {
@@ -1041,39 +1100,52 @@ function updateMarkTools() {
     : '文章をドラッグして選んでください';
 }
 
-// 本文（Markdown）の n 番目の一致箇所を置き換える
-function replaceNth(src, needle, occurrence, make) {
-  let at = -1;
-  for (let k = 0; k <= occurrence; k++) {
-    at = src.indexOf(needle, at + 1);
-    if (at === -1) return null;
-  }
-  return src.slice(0, at) + make(needle) + src.slice(at + needle.length);
+// 本文の指定行だけを取り出す／書き戻す
+function blockSource(from, to) {
+  return $('#articleText').value.split('\n').slice(from, to + 1).join('\n');
+}
+function writeBlock(from, to, replacement) {
+  const lines = $('#articleText').value.split('\n');
+  lines.splice(from, to - from + 1, ...replacement.split('\n'));
+  return lines.join('\n');
 }
 
 async function applyDecoration(kind) {
   const s = previewSelection();
   if (!s) return toast('先に文章を選んでください');
+  if (!s.block) return toast('この場所は装飾できません（目次や商品カードの中です）');
 
-  const cur = $('#articleText').value;
-  let next = null;
+  const src = blockSource(s.from, s.to);
+  const { plain, map, tok } = expandSource(src);
 
   if (kind === 'clear') {
-    // 囲みを外す。マーカーと太字の両方に対応します。
-    next = replaceNth(cur, '==' + s.text + '==', 0, () => s.text)
-      || replaceNth(cur, '**' + s.text + '**', 0, () => s.text);
-    if (!next) return toast('この部分には装飾が付いていないようです');
+    const stripped = src.replace('==' + s.text + '==', s.text).replace('**' + s.text + '**', s.text);
+    if (stripped === src) return toast('この部分には装飾が付いていないようです');
+    $('#articleText').value = writeBlock(s.from, s.to, stripped);
   } else {
-    const wrap = kind === 'mark' ? '==' : '**';
-    if (cur.includes(wrap + s.text + wrap)) return toast('すでに付いています');
-    next = replaceNth(cur, s.text, s.occurrence, (t) => wrap + t + wrap);
-    if (!next) {
-      return toast('本文の中で場所を特定できませんでした。'
-        + '記号やリンクをまたいで選んでいる可能性があります。短めに選び直してください');
+    const wrap = '==';
+    if (src.includes(wrap + s.text + wrap)) return toast('すでに付いています');
+
+    // ブロックの中で、選んだ順番と同じ位置を探します
+    let at = -1;
+    for (let k = 0; k <= s.occurrence; k++) {
+      at = plain.indexOf(s.text, at + 1);
+      if (at === -1) break;
     }
+    if (at === -1) at = plain.indexOf(s.text);
+    if (at === -1) {
+      return toast('本文の中で場所を特定できませんでした。短めに選び直してください');
+    }
+    // 選んだ範囲がリンク記法の途中から始まっている（終わっている）場合は、
+    // 記法の外側まで広げます。内側に == を入れると記法が壊れるためです。
+    const last = at + s.text.length - 1;
+    const a = tok[at] ? tok[at].s : map[at];
+    const b = tok[last] ? tok[last].e : map[last] + 1;
+    const out = src.slice(0, a) + wrap + src.slice(a, b) + wrap + src.slice(b);
+    $('#articleText').value = writeBlock(s.from, s.to, out);
   }
 
-  $('#articleText').value = next;
+  const next = $('#articleText').value;
   await saveProject({ article: next });
   updateChars();
   // いま見ている場所のまま作り直します（先頭に戻らないように）
@@ -1103,6 +1175,68 @@ $('#btnBoldToMark').addEventListener('click', async () => {
   await renderPreview({ keepScroll: true, skipBuild: true });
   toast(`${n}か所をマーカーに変えました`);
 });
+
+// ---- プレビューの中で、その段落だけを書き換える ----
+// 本文（Markdown）の該当行だけを取り出して編集し、書き戻します。
+// 記事全体の長いテキスト欄をスクロールしなくて済みます。
+let EDITING = null;
+
+function openBlockEditor(block, d) {
+  if (EDITING) return;
+  const attr = block.getAttribute('data-ln');
+  if (!attr) return;
+  const [from, to] = attr.split(',').map(Number);
+  const src = blockSource(from, to);
+
+  const cs = d.defaultView.getComputedStyle(block);
+  const wrap = d.createElement('div');
+  const ta = d.createElement('textarea');
+  ta.className = 'edit-box';
+  ta.value = src;
+  ['fontFamily', 'fontSize', 'lineHeight', 'letterSpacing'].forEach((k) => { ta.style[k] = cs[k]; });
+
+  const bar = d.createElement('div');
+  bar.className = 'edit-bar';
+  bar.innerHTML = '<button class="ok">保存</button><button class="no">やめる</button>'
+    + '<small>⌘+Enter で保存　Esc でやめる</small>';
+
+  wrap.appendChild(ta);
+  wrap.appendChild(bar);
+  block.parentNode.insertBefore(wrap, block);
+  block.style.display = 'none';
+  EDITING = { block, wrap, from, to };
+
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 4) + 'px'; };
+  fit();
+  ta.addEventListener('input', fit);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  const close = () => {
+    if (!EDITING) return;
+    EDITING.wrap.remove();
+    EDITING.block.style.display = '';
+    EDITING = null;
+  };
+  const save = async () => {
+    const next = ta.value;
+    close();
+    if (next === src) return;
+    $('#articleText').value = writeBlock(from, to, next);
+    await saveProject({ article: $('#articleText').value });
+    updateChars();
+    renderPlaceholders();
+    await renderPreview({ keepScroll: true, skipBuild: true });
+    toast('書き換えました');
+  };
+
+  bar.querySelector('.ok').addEventListener('click', save);
+  bar.querySelector('.no').addEventListener('click', close);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+  });
+}
 
 // ---- コピペチェック ----
 $('#btnCopyCheck').addEventListener('click', async () => {

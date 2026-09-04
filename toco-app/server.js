@@ -744,7 +744,8 @@ const server = http.createServer(async (req, res) => {
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
       const md = body.article != null ? body.article : bodyOf(pr);
       // 目次は本文の最初の見出しの直前に入るので、プレビューでも同じ位置にします
-      const r = builder.renderArticle(md);
+      // プレビューでは、どのHTMLが本文の何行目かを埋め込みます（その場で直せるようにするため）
+      const r = builder.renderArticle(md, { trackSource: true });
       let html = r.html;
       if (r.toc) {
         const at = html.indexOf('<h2');

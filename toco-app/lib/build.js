@@ -687,7 +687,7 @@ function build(opts) {
 
 // 公開前チェックのプレビュー用。
 // 本番のビルドと同じ関数を通すので、見た目が食い違いません。
-function renderArticle(md) {
+function renderArticle(md, opts) {
   const settings = DB.loadSettings();
   const byId = {};
   products.load().forEach((p) => { byId[p.id] = p; });
@@ -700,6 +700,7 @@ function renderArticle(md) {
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
+    trackSource: !!(opts && opts.trackSource),
   });
   return { html: r.html, toc: r.toc, headings: r.headings };
 }
