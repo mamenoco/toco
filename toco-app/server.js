@@ -448,16 +448,27 @@ const server = http.createServer(async (req, res) => {
       const pr = db.projects.find((x) => x.id === body.id);
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
 
+      let patchEye = '';
       // スラッグを変えるときはファイル名も変える（URLが変わるので注意が要る）
       if (body.slug && body.slug !== pr.slug) {
         if (!articles.isValidSlug(body.slug)) {
           return send(res, 200, { error: 'URLは英小文字・数字・ハイフンだけで入力してください' });
         }
         if (pr.slug && articles.read(pr.slug)) articles.rename(pr.slug, body.slug);
+        // アイキャッチはスラッグ名で保存しているので、一緒に付け替えます
+        const eyeDir = path.join(ROOT, 'site', 'assets', 'eyecatch');
+        ['png', 'jpg'].forEach((ext) => {
+          const from = path.join(eyeDir, `${pr.slug}.${ext}`);
+          if (fs.existsSync(from)) {
+            fs.renameSync(from, path.join(eyeDir, `${body.slug}.${ext}`));
+            patchEye = `/assets/eyecatch/${body.slug}.${ext}`;
+          }
+        });
         pr.slug = body.slug;
       }
 
       const patch = {};
+      if (patchEye) patch.eyecatch = patchEye;
       ['title', 'description', 'eyecatch', 'date'].forEach((k) => {
         if (body[k] != null) patch[k] = body[k];
       });
@@ -844,6 +855,18 @@ const server = http.createServer(async (req, res) => {
       const rel = `/assets/eyecatch/${name}`;
       writeArticle(pr, null, { eyecatch: rel });
       return send(res, 200, { ok: true, path: rel });
+    }
+
+    if (p === '/api/eyecatch/delete') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr || !pr.slug) return send(res, 200, { error: '記事が見つかりません' });
+      const dir = path.join(ROOT, 'site', 'assets', 'eyecatch');
+      ['png', 'jpg'].forEach((ext) => {
+        const f = path.join(dir, `${pr.slug}.${ext}`);
+        if (fs.existsSync(f)) fs.unlinkSync(f);
+      });
+      writeArticle(pr, null, { eyecatch: '' });
+      return send(res, 200, { ok: true });
     }
 
     // ===== サイトの公開 =====

@@ -862,7 +862,7 @@ function aiPoll() {
           + '<div class="row" style="margin-top:8px"><button class="ghost" id="btnUseSuggest">公開の設定に入れる</button>'
           + '<span class="note">いまの内容は上書きされます</span></div>';
         $('#btnUseSuggest').onclick = () => {
-          if (AI_SUGGESTED.title) { $('#pubTitle').value = AI_SUGGESTED.title; $('#eyeTitle').value = AI_SUGGESTED.title; }
+          if (AI_SUGGESTED.title) $('#pubTitle').value = AI_SUGGESTED.title;
           if (AI_SUGGESTED.description) $('#pubDesc').value = AI_SUGGESTED.description;
           if (AI_SUGGESTED.tags) $('#pubTags').value = AI_SUGGESTED.tags;
           gotoStep(4);
@@ -1387,12 +1387,9 @@ function fillMetaForm() {
   $('#pubDesc').value = m.description || '';
   $('#pubDate').value = (m.date || '').slice(0, 10);
   $$('input[name=pubStatus]').forEach((r) => { r.checked = r.value === (m.status === 'publish' ? 'publish' : 'draft'); });
-  $('#eyeTitle').value = m.title || CURRENT.title || '';
-  const theme = { food: 'food', house: 'house', toy: 'toy', care: 'care', life: 'life' }[catSlug(CURRENT.category)];
-  if (theme) $('#eyeTheme').value = theme;
   updateUrlPreview();
   renderPubReady();
-  drawEyecatch();
+  renderEyecatch();
 }
 
 function updateUrlPreview() {
@@ -1476,112 +1473,67 @@ $('#btnPublishNow').addEventListener('click', async () => {
 });
 
 // ---- アイキャッチ ----
-const THEMES = {
-  food: { bg: '#eef4ea', bar: '#6f9463', label: 'えさ・牧草' },
-  house: { bg: '#eaf0f4', bar: '#5f7f99', label: 'ケージ・サークル' },
-  toy: { bg: '#fbf0e6', bar: '#c98b6b', label: 'おもちゃ・用品' },
-  care: { bg: '#f7ecef', bar: '#b3707f', label: 'お手入れ・健康' },
-  life: { bg: '#f1eef6', bar: '#7f739c', label: 'しつけ・暮らし' },
-};
-let EYE_FROM_FILE = false;
-
-function drawEyecatch() {
-  const cv = $('#eyeCanvas');
-  if (!cv || EYE_FROM_FILE) return;
-  const g = cv.getContext('2d');
-  const t = THEMES[$('#eyeTheme').value] || THEMES.toy;
-  const W = 1200, H = 630;
-  cv.width = W; cv.height = H;
-  g.fillStyle = t.bg; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#fff';
-  g.beginPath(); g.roundRect(56, 56, W - 112, H - 112, 20); g.fill();
-  g.fillStyle = t.bar; g.fillRect(56, 56, 10, H - 112);
-  g.fillStyle = t.bar;
-  g.font = '500 26px "Hiragino Sans", sans-serif';
-  g.fillText(t.label, 110, 132);
-
-  const title = ($('#eyeTitle').value || '（タイトル未入力）');
-  g.fillStyle = '#3d3630';
-  const size = title.length > 34 ? 46 : title.length > 24 ? 54 : 62;
-  g.font = `700 ${size}px "Hiragino Sans", sans-serif`;
-  const maxW = W - 220;
-  const lines = [];
-  let line = '';
-  for (const ch of title) {
-    if (g.measureText(line + ch).width > maxW) { lines.push(line); line = ch; } else line += ch;
+// 文字で作る機能は使わない方針にしたので、アップロードだけです。
+// 選んだ画像は 1200×630 に中央基準で切り抜いてから保存します。
+function renderEyecatch() {
+  const box = $('#eyeCurrent');
+  const path = CURMETA.eyecatch;
+  if (!path) {
+    box.innerHTML = '<p class="note" style="color:var(--err)">まだ設定されていません。'
+      + '一覧では代わりの画像が使われます。</p>';
+    return;
   }
-  if (line) lines.push(line);
-  const shown = lines.slice(0, 4);
-  const lh = size * 1.45;
-  let y = H / 2 - ((shown.length - 1) * lh) / 2 + size / 3;
-  shown.forEach((l) => { g.fillText(l, 110, y); y += lh; });
-
-  g.fillStyle = '#8b8179';
-  g.font = '400 24px "Hiragino Sans", sans-serif';
-  g.fillText('tocoとくらし', 110, H - 108);
+  // 保存し直したときに古い画像が残らないよう、後ろに時刻を付けます
+  box.innerHTML = `<div class="row" style="align-items:flex-start">
+    <img src="${esc(path)}?t=${Date.now()}" alt=""
+      style="width:100%;max-width:420px;border:1px solid var(--line);border-radius:9px;display:block">
+    <div><p class="note" style="margin:0">${esc(path)}</p>
+      <button class="ghost danger" id="btnEyeRemove" style="margin-top:8px">この画像を外す</button></div>
+  </div>`;
+  $('#btnEyeRemove').onclick = async () => {
+    if (!confirm('アイキャッチを外します。よろしいですか？')) return;
+    await api('eyecatch/delete', { id: CURRENT.id });
+    CURMETA.eyecatch = '';
+    renderEyecatch(); renderPubReady();
+    toast('外しました');
+  };
 }
-$('#btnMakeEye').addEventListener('click', () => { EYE_FROM_FILE = false; drawEyecatch(); });
-$('#eyeTitle').addEventListener('input', drawEyecatch);
-$('#eyeTheme').addEventListener('change', drawEyecatch);
-
-$$('input[name=eyeMode]').forEach((r) => r.addEventListener('change', () => {
-  const mode = document.querySelector('input[name=eyeMode]:checked').value;
-  $('#eyeUploadBox').style.display = mode === 'upload' ? '' : 'none';
-  $('#eyeGenerateBox').style.display = mode === 'generate' ? '' : 'none';
-  if (mode === 'generate') { EYE_FROM_FILE = false; drawEyecatch(); }
-}));
 
 $('#eyeFile').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
+  if (!CURRENT.slug) { e.target.value = ''; return toast('先にURLを決めて保存してください'); }
   const before = Math.round(file.size / 1024);
+  $('#eyeSaved').innerHTML = '<span class="spin"></span>取り込んでいます…';
+
   const reader = new FileReader();
   reader.onload = () => {
     const img = new Image();
-    img.onload = () => {
-      const cv = $('#eyeCanvas'), g = cv.getContext('2d');
-      const W = 1200, H = 630;
+    img.onload = async () => {
+      const cv = $('#eyeCanvas');
+      const g = cv.getContext('2d');
+      const W = 1200; const H = 630;
       cv.width = W; cv.height = H;
       g.fillStyle = '#fffaf6'; g.fillRect(0, 0, W, H);
+      // 縦横比を保ったまま、中央を切り抜いて全面に敷きます
       const scale = Math.max(W / img.width, H / img.height);
-      const w = img.width * scale, h = img.height * scale;
+      const w = img.width * scale; const h = img.height * scale;
       g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
-      EYE_FROM_FILE = true;
-      $('#btnClearEye').style.display = '';
-      const after = Math.round(cv.toDataURL('image/jpeg', 0.85).length * 0.75 / 1024);
-      $('#eyeFileInfo').innerHTML = `${esc(file.name)}　${before}KB → <strong>約${after}KB</strong>（1200×630に調整）`;
-      toast('画像を読み込みました');
+
+      try {
+        const r = await api('eyecatch/save', { id: CURRENT.id, dataUrl: cv.toDataURL('image/jpeg', 0.85) });
+        CURMETA.eyecatch = r.path;
+        renderEyecatch(); renderPubReady();
+        const after = Math.round(cv.toDataURL('image/jpeg', 0.85).length * 0.75 / 1024);
+        $('#eyeSaved').textContent = `${before}KB → 約${after}KB（1200×630）`;
+        toast('アイキャッチを保存しました');
+      } catch (err) { $('#eyeSaved').textContent = ''; }
+      e.target.value = '';
     };
-    img.onerror = () => toast('画像を読み込めませんでした');
+    img.onerror = () => { $('#eyeSaved').textContent = ''; toast('画像を読み込めませんでした'); };
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
-});
-
-$('#btnClearEye').addEventListener('click', () => {
-  $('#eyeFile').value = ''; $('#eyeFileInfo').textContent = '';
-  $('#btnClearEye').style.display = 'none';
-  EYE_FROM_FILE = false; drawEyecatch();
-});
-
-function eyecatchDataUrl() {
-  const cv = $('#eyeCanvas');
-  return EYE_FROM_FILE ? cv.toDataURL('image/jpeg', 0.85) : cv.toDataURL('image/png');
-}
-
-$('#btnSaveEye').addEventListener('click', async () => {
-  if (!CURRENT.slug) return toast('先にURLを決めて保存してください');
-  const r = await api('eyecatch/save', { id: CURRENT.id, dataUrl: eyecatchDataUrl() });
-  CURMETA.eyecatch = r.path;
-  renderPubReady();
-  flash('#eyeSaved', '保存しました：' + r.path);
-});
-
-$('#btnDownloadEye').addEventListener('click', () => {
-  const a = document.createElement('a');
-  a.download = (CURRENT?.slug || 'eyecatch') + (EYE_FROM_FILE ? '.jpg' : '.png');
-  a.href = eyecatchDataUrl();
-  a.click();
 });
 
 // ================================================================

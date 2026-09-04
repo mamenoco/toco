@@ -261,31 +261,14 @@
 
     <div class="card">
       <h3>アイキャッチ</h3>
-      <p class="note">一覧とSNSで使われる画像です。1200×630で書き出します。</p>
-      <div class="row">
-        <label style="margin:0"><input type="radio" name="eyeMode" value="generate" checked> 文字で作る</label>
-        <label style="margin:0"><input type="radio" name="eyeMode" value="upload"> 画像を選ぶ</label>
-      </div>
-      <div id="eyeGenerateBox">
-        <div class="inline" style="margin-top:10px">
-          <label>見出し<input id="eyeTitle"></label>
-          <label style="max-width:190px">配色<select id="eyeTheme">
-            <option value="food">えさ・牧草</option><option value="house">ケージ・サークル</option>
-            <option value="toy">おもちゃ・用品</option><option value="care">お手入れ・健康</option>
-            <option value="life">しつけ・暮らし</option></select></label>
-          <button class="ghost" id="btnMakeEye">作り直す</button>
-        </div>
-      </div>
-      <div id="eyeUploadBox" style="display:none;margin-top:10px">
+      <p class="note">記事一覧とSNSで使われる画像です。選ぶと自動で1200×630に整えて保存します。
+        中央を基準に切り抜くので、見せたいものが中央に来ている写真が向いています。</p>
+      <div id="eyeCurrent"></div>
+      <div class="row" style="margin-top:10px">
         <input type="file" id="eyeFile" accept="image/*">
-        <p class="note" id="eyeFileInfo"></p>
-        <button class="ghost" id="btnClearEye" style="display:none">取り消す</button>
+        <span class="note" id="eyeSaved"></span>
       </div>
-      <canvas id="eyeCanvas" width="1200" height="630"
-        style="width:100%;max-width:520px;margin-top:12px;border:1px solid var(--line);border-radius:9px"></canvas>
-      <div class="row"><button class="primary" id="btnSaveEye">この画像を使う</button>
-        <button class="ghost" id="btnDownloadEye">ダウンロード</button>
-        <span class="note" id="eyeSaved"></span></div>
+      <canvas id="eyeCanvas" width="1200" height="630" hidden></canvas>
     </div>
 
     <div class="card">
