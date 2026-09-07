@@ -253,6 +253,8 @@
   <div class="stepbox" data-box="4" hidden>
     <div class="card">
       <h3>記事の情報</h3>
+      <p class="note" id="metaAutoNote">本文ができていれば、タイトルと説明文は本文から自動で入ります。
+        入ったあとは自由に直せます。</p>
       <label>タイトル<input id="pubTitle"></label>
       <div class="grid2">
         <label>URL（英小文字・数字・ハイフン）<input id="pubSlug" placeholder="rabbit-cage"></label>
@@ -263,6 +265,7 @@
       <label>説明文（検索結果と一覧に出ます・80〜120字）<textarea id="pubDesc" rows="3"></textarea></label>
       <label>公開日<input id="pubDate" type="date"></label>
       <div class="row"><button class="primary" id="btnSaveMeta">保存</button>
+        <button class="ghost" id="btnMetaSuggest">本文から作り直す</button>
         <span class="note" id="metaSaved"></span></div>
     </div>
 

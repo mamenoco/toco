@@ -639,6 +639,16 @@ function buildExtras(published, ctx, extra) {
     ].join('\n'));
   }
 
+  // ワードプレス時代のURLの引き取り先。
+  // 旧サイトにあって新サイトに無いページは、そのままだと404になります。
+  // 数は少ないので、トップに送っておきます（301＝恒久的な引っ越し）。
+  write('_redirects', [
+    '/archive        /  301',
+    '/ranking-top20  /  301',
+    '/sample-page    /  301',
+    '',
+  ].join('\n'));
+
   // 検索用のインデックス
   write('search-index.json', JSON.stringify(published.map((a) => ({
     t: a.title, u: `/${a.slug}/`, c: a.category, d: a.description,

@@ -243,7 +243,10 @@ function renderIdeas() {
   $('#ideaList').innerHTML = list.length ? `<div class="card"><table class="tbl">
     <thead><tr><th>タイトル</th><th>カテゴリ</th><th>優先</th><th>状態</th><th class="r"></th></tr></thead><tbody>
     ${list.map((i) => `<tr>
-      <td class="t">${esc(i.title)}<div class="note" style="margin:2px 0 0">${esc(i.keyword || '')}${i.note ? '　' + esc(i.note) : ''}</div></td>
+      <td class="t">${esc(i.title)}${i.ownsArticle ? ' <span class="tag ok">この記事ネタの記事</span>' : ''}${i.duplicate && !i.ownsArticle ? ' <span class="tag warn">重複</span>' : ''}
+        <div class="note" style="margin:2px 0 0">${esc(i.keyword || '')}${i.slug ? '　/' + esc(i.slug) + '/' : ''}${i.note ? '　' + esc(i.note) : ''}</div>
+        ${i.duplicate && !i.ownsArticle
+    ? '<div class="note" style="margin:3px 0 0;color:var(--err)">同じURLの記事ネタが他にあります。記事はそちらから書かれているので、こちらは消して構いません。</div>' : ''}</td>
       <td>${esc(i.category || '—')}</td>
       <td><span class="tag">${esc(i.priority || '中')}</span></td>
       <td><span class="tag ${i.status === '未着手' ? '' : 'pink'}">${esc(i.status)}</span></td>
@@ -274,6 +277,8 @@ function ideaForm(idea) {
   modal(`<h3>${idea ? '記事ネタを編集' : '記事ネタを追加'}</h3>
     <label>タイトル<input id="iTitle" value="${esc(it.title || '')}"></label>
     <label>検索キーワード<input id="iKw" value="${esc(it.keyword || '')}" placeholder="うさぎ 牧草"></label>
+    <label>URL（決めてあれば。書きはじめるときに引き継ぎます）
+      <input id="iSlug" value="${esc(it.slug || '')}" placeholder="rabbit-hay"></label>
     <div class="grid2">
       <label>カテゴリ<select id="iCat">${CAT_NAMES().map((c) =>
     `<option ${c === it.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
@@ -288,6 +293,7 @@ function ideaForm(idea) {
     if (!title) return toast('タイトルを入れてください');
     await api('ideas/save', {
       id: it.id, title, keyword: $('#iKw').value.trim() || title,
+      slug: $('#iSlug').value.trim(),
       category: $('#iCat').value, priority: $('#iPri').value, note: $('#iNote').value.trim(),
     });
     closeModal(); await refresh(); renderIdeas();
@@ -391,6 +397,14 @@ $('#btnDeleteProject').addEventListener('click', async () => {
 function gotoStep(n) {
   if (CURRENT) setHash(`edit/${CURRENT.id}/${n}`);
   if (String(n) === '3' && CURRENT && !$('#previewFrame').srcdoc) renderPreview({});
+  // 公開前の段階に入ったら、本文に合ったタイトルと説明文を用意しておきます
+  if ((String(n) === '3' || String(n) === '4') && CURRENT && META_TRIED !== CURRENT.id) {
+    const rough = !looksLikeArticleTitle($('#pubTitle').value) || !$('#pubDesc').value.trim();
+    if (rough && $('#articleText').value.trim().length >= 400) {
+      META_TRIED = CURRENT.id;
+      suggestMeta(false);
+    }
+  }
   $$('.step').forEach((b) => b.classList.toggle('on', b.dataset.step === String(n)));
   $$('.stepbox').forEach((b) => { b.hidden = b.dataset.box !== String(n); });
   markStepsDone();
@@ -1449,6 +1463,73 @@ function askFix(items) {
   aiRun('revise');
 }
 
+// ---- タイトル・説明文を本文から作る ----
+//
+// 記事ネタの段階のタイトル（「うさぎのトイレのおすすめ」）のままだと、
+// 検索結果に出したときに中身が伝わりません。
+// 本文ができていたら、本文に沿ったタイトルと説明文を自動で入れます。
+// すでに書き直したものは上書きしません。
+
+// 記事の形をしたタイトルかどうか（「｜」で区切って「○選」が入っているか）
+function looksLikeArticleTitle(t) {
+  const s = String(t || '').trim();
+  return s.includes('｜') && /[0-9０-９]+選/.test(s);
+}
+
+// 本文のいちばん上の見出し（# …）。読者が実際に目にする題です。
+function bodyHeading() {
+  const m = $('#articleText').value.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : '';
+}
+
+let META_TRIED = '';
+
+async function suggestMeta(force) {
+  if (!CURRENT) return;
+  const bodyText = $('#articleText').value.trim();
+  if (bodyText.length < 400) {
+    if (force) toast('本文がまだ短いため、作れませんでした');
+    return;
+  }
+  const note = $('#metaAutoNote');
+
+  // タイトルは、本文の見出しがそのまま正解です。待たずに入れます。
+  const h1 = bodyHeading();
+  const titleIsRough = !looksLikeArticleTitle($('#pubTitle').value);
+  let filledTitle = false;
+  if (h1 && (force || titleIsRough || h1 !== $('#pubTitle').value.trim())) {
+    $('#pubTitle').value = h1;
+    filledTitle = true;
+    renderPubReady();
+  }
+
+  // 説明文とタグは本文を読まないと書けないので、Claudeに頼みます
+  if (!force && $('#pubDesc').value.trim() && $('#pubTags').value.trim()) {
+    if (filledTitle) note.innerHTML = 'タイトルを本文の見出しに合わせました。内容を確かめて「保存」を押してください。';
+    return;
+  }
+
+  note.innerHTML = '<span class="spin"></span>本文を読んで、説明文を作っています…';
+  $('#btnMetaSuggest').disabled = true;
+  try {
+    const r = await api('meta/suggest', { id: CURRENT.id, article: bodyText });
+    // 本文に見出しが無かったときだけ、Claudeの案をタイトルに使います
+    if (r.title && !h1 && (force || titleIsRough)) $('#pubTitle').value = r.title;
+    if (r.description && (force || !$('#pubDesc').value.trim())) $('#pubDesc').value = r.description;
+    if (r.tags && (force || !$('#pubTags').value.trim())) $('#pubTags').value = r.tags;
+    renderPubReady();
+    note.innerHTML = '本文から入れました。<b>内容を確かめて、「保存」を押してください。</b>'
+      + '　合わないところは直して構いません。';
+  } catch (e) {
+    note.textContent = '本文からは作れませんでした。手で入れてください。';
+  } finally { $('#btnMetaSuggest').disabled = false; }
+}
+
+$('#btnMetaSuggest').addEventListener('click', () => {
+  if ($('#pubTitle').value.trim() && !confirm('いまのタイトルと説明文を、本文から作り直したものに置き換えます。よろしいですか？')) return;
+  suggestMeta(true);
+});
+
 // ---- ステップ4：公開の設定 ----
 function fillMetaForm() {
   const m = CURMETA;
@@ -1472,6 +1553,9 @@ function updateUrlPreview() {
   const slug = $('#pubSlug').value.trim();
   $('#pubUrlPreview').innerHTML = slug
     ? `公開されるURL： <b>https://toco-to.com/${esc(slug)}/</b>`
+      + (/^article(-\d+)?$/.test(slug)
+        ? '<br><span style="color:var(--err)">これは仮のURLです。記事の内容が分かる名前に変えてください'
+          + '（例：rabbit-toilet）。公開したあとで変えると、いまのURLは開けなくなります。</span>' : '')
     : '<span style="color:var(--err)">URLを入力してください</span>';
 }
 $('#pubSlug').addEventListener('input', updateUrlPreview);
@@ -1505,7 +1589,8 @@ function renderPubReady() {
   const want = document.querySelector('input[name=pubStatus]:checked').value === 'publish';
   const items = [
     ['タイトル', !!$('#pubTitle').value.trim()],
-    ['URL', /^[a-z0-9][a-z0-9-]*$/.test($('#pubSlug').value.trim())],
+    ['URL', /^[a-z0-9][a-z0-9-]*$/.test($('#pubSlug').value.trim())
+      && !/^article(-\d+)?$/.test($('#pubSlug').value.trim())],
     ['説明文', $('#pubDesc').value.trim().length >= 40],
     ['本文', $('#articleText').value.trim().length > 800],
     ['アイキャッチ', !!CURMETA.eyecatch],

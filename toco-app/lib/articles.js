@@ -107,10 +107,54 @@ function list() {
     .sort((x, y) => String(y.date || y.mtime).localeCompare(String(x.date || x.mtime)));
 }
 
+// 日本語のキーワードから、意味の分かるURLを作るための対応表。
+// 「うさぎ トイレ」→ rabbit-toilet のように組み立てます。
+// ここに無い語は落とすので、うまく作れないときは呼び出し側で気づけるよう '' を返します。
+const SLUG_WORDS = [
+  ['うさぎ', 'rabbit'], ['ウサギ', 'rabbit'], ['ラビット', 'rabbit'],
+  ['チモシー', 'timothy'], ['アルファルファ', 'alfalfa'], ['牧草入れ', 'hayrack'], ['牧草', 'hay'],
+  ['ペレット', 'pellet'], ['おやつ', 'treat'], ['サプリ', 'supplement'],
+  ['ケージ', 'cage'], ['サークル', 'pen'], ['すのこ', 'floor'], ['ロフト', 'loft'],
+  ['トイレ砂', 'litter'], ['トイレシーツ', 'sheet'], ['トイレ', 'toilet'],
+  ['シーツ', 'sheet'], ['マット', 'mat'], ['消臭', 'deodorant'],
+  ['キャリー', 'carry'], ['ハーネス', 'harness'],
+  ['給水', 'bottle'], ['水入れ', 'bottle'], ['食器', 'bowl'], ['えさ入れ', 'bowl'],
+  ['おもちゃ', 'toy'], ['かじり木', 'chewtoy'], ['トンネル', 'tunnel'],
+  ['ブラシ', 'brush'], ['爪切り', 'nailclipper'], ['換毛', 'molting'], ['グルーミング', 'grooming'],
+  ['ヒーター', 'heater'], ['寒さ', 'cold'], ['暑さ', 'heat'], ['冷感', 'cooling'], ['温度', 'temperature'],
+  ['ベッド', 'bed'], ['ハウス', 'house'], ['ステップ', 'step'],
+  ['しつけ', 'training'], ['多頭', 'multi'], ['お迎え', 'welcome'], ['初心者', 'beginner'],
+  ['健康', 'health'], ['病気', 'illness'], ['うっ滞', 'stasis'], ['体重', 'weight'],
+  ['掃除', 'cleaning'], ['ニオイ', 'odor'], ['におい', 'odor'], ['臭い', 'odor'],
+];
+
+// 「うさぎ トイレのおすすめ」のような日本語から、英字のURLを組み立てます。
+// 作れなかったときは '' を返します（呼び出し側で確認を促すため）。
+function slugFromJapanese(text) {
+  const src = String(text || '');
+  const parts = [];
+  SLUG_WORDS.forEach(([ja, en]) => {
+    if (src.includes(ja) && !parts.includes(en)) parts.push(en);
+  });
+  if (!parts.length) return '';
+  // rabbit は必ず先頭に置いて、それ以外は2語までにします
+  const rest = parts.filter((x) => x !== 'rabbit').slice(0, 2);
+  const head = parts.includes('rabbit') ? ['rabbit'] : [];
+  return head.concat(rest).join('-');
+}
+
+// 自動で付いただけのURL（article / article-2）かどうか。
+// 画面で「決め直してください」と伝えるために使います。
+function isPlaceholderSlug(slug) {
+  return /^article(-\d+)?$/.test(String(slug || ''));
+}
+
 // 使えるスラッグの候補を出す（重複を避けて連番を付ける）
 function suggestSlug(base) {
-  const clean = String(base || 'article').toLowerCase().replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'article';
+  // 日本語が混じっていたら、まず対応表で英字に置き換えます
+  const raw = String(base || '');
+  const ascii = raw.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  const clean = ascii || slugFromJapanese(raw) || 'article';
   if (!fs.existsSync(filePath(clean))) return clean;
   for (let i = 2; i < 100; i++) {
     if (!fs.existsSync(filePath(`${clean}-${i}`))) return `${clean}-${i}`;
@@ -118,4 +162,7 @@ function suggestSlug(base) {
   return `${clean}-${Date.now()}`;
 }
 
-module.exports = { DIR, read, save, rename, remove, list, parse, stringify, isValidSlug, suggestSlug, filePath };
+module.exports = {
+  DIR, read, save, rename, remove, list, parse, stringify,
+  isValidSlug, suggestSlug, filePath, slugFromJapanese, isPlaceholderSlug,
+};

@@ -38,6 +38,7 @@ const links = require('./lib/links.js');
 const similarity = require('./lib/similarity.js');
 const imageAI = require('./lib/image-ai.js');
 const translate = require('./lib/translate.js');
+const meta = require('./lib/meta.js');
 const preview = require('./lib/preview-server.js');
 const fal = require('./lib/fal.js');
 const stamps = require('./lib/stamps.js');
@@ -198,10 +199,26 @@ const server = http.createServer(async (req, res) => {
     // ===== 全体の状態 =====
     if (p === '/api/state') {
       if (!db.ideas) { db.ideas = DB.seedIdeas(); DB.saveDb(db); }
+      if (syncIdeas(db)) DB.saveDb(db);
+      // 同じURLのネタが2つ以上あるときは、画面で見分けられるように印を付けます
+      const slugCount = {};
+      (db.ideas || []).forEach((x) => {
+        if (x.slug) slugCount[x.slug] = (slugCount[x.slug] || 0) + 1;
+      });
+      const ideas = (db.ideas || []).map((x) => {
+        const pr = x.projectId ? db.projects.find((y) => y.id === x.projectId) : null;
+        return Object.assign({}, x, {
+          // この記事ネタから実際に記事を書いたか
+          ownsArticle: !!(pr && pr.ideaId === x.id),
+          // 同じURLのネタが他にもあるか
+          duplicate: !!(x.slug && slugCount[x.slug] > 1),
+        });
+      });
+
       return send(res, 200, {
         settings,
         inventory: db.inventory,
-        ideas: db.ideas,
+        ideas,
         projects: db.projects.map(projectSummary),
         site: siteState(),
         categories: siteConfig.categories,
@@ -336,6 +353,13 @@ const server = http.createServer(async (req, res) => {
     // ===== 記事ネタ =====
     if (p === '/api/ideas/save') {
       db.ideas = db.ideas || DB.seedIdeas();
+      if (body.slug != null) {
+        const v = String(body.slug).trim();
+        if (v && !articles.isValidSlug(v)) {
+          return send(res, 200, { error: 'URLは英小文字・数字・ハイフンで入力してください' });
+        }
+        body.slug = v;
+      }
       if (body.id) {
         const i = db.ideas.findIndex((x) => x.id === body.id);
         if (i >= 0) db.ideas[i] = Object.assign(db.ideas[i], body);
@@ -377,6 +401,7 @@ const server = http.createServer(async (req, res) => {
       });
       idea.status = '作成中';
       idea.projectId = pr.id;
+      idea.slug = pr.slug; // 記事ネタ一覧にも、実際に使うURLを出すため
       DB.saveDb(db);
       return send(res, 200, { ok: true, project: pr });
     }
@@ -446,8 +471,20 @@ const server = http.createServer(async (req, res) => {
     // リンク待ちを記事ネタに登録する
     if (p === '/api/links/to-idea') {
       db.ideas = db.ideas || DB.seedIdeas();
+      // 同じURLのネタがあれば、それで足ります
       const exists = db.ideas.find((x) => x.slug === body.slug);
       if (exists) return send(res, 200, { ok: true, ideas: db.ideas, already: true });
+
+      // URLは違っても、同じキーワードのネタがすでにあることがあります。
+      // そこに新しく足すと同じテーマのネタが2つ並んで紛らわしいので、
+      // まだURLが決まっていなければ、そのネタにこのURLを入れます。
+      const sameTopic = db.ideas.find((x) =>
+        !x.slug && (x.keyword === body.keyword || x.title === body.title));
+      if (sameTopic) {
+        sameTopic.slug = body.slug;
+        DB.saveDb(db);
+        return send(res, 200, { ok: true, ideas: db.ideas, merged: sameTopic.title });
+      }
       db.ideas.push({
         id: DB.newId(),
         title: body.title || body.label || body.slug,
@@ -506,7 +543,8 @@ const server = http.createServer(async (req, res) => {
         const idea = (db.ideas || []).find((x) => x.id === pr.ideaId);
         if (idea) {
           idea.status = saved.meta.status === 'publish' ? '公開' : '作成中';
-          if (!idea.slug && pr.slug) idea.slug = pr.slug;
+          // URLは記事側が正です。ここで合わせないと、記事ネタ一覧のURLだけ古いまま残ります。
+          if (pr.slug) idea.slug = pr.slug;
         }
       }
       DB.saveDb(db);
@@ -892,6 +930,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // ===== 本文からタイトル・説明文の案を作る =====
+    if (p === '/api/meta/suggest') {
+      const pr = db.projects.find((x) => x.id === body.id);
+      if (!pr) return send(res, 200, { error: '記事が見つかりません' });
+      const text = body.article != null ? body.article : bodyOf(pr);
+      try {
+        const r = await meta.suggest({
+          body: text, keyword: pr.keyword || pr.title || '',
+          category: pr.category || '', model: settings.aiModel,
+        });
+        return send(res, 200, Object.assign({ ok: true }, r));
+      } catch (e) {
+        return send(res, 200, { error: String(e.message || e) });
+      }
+    }
+
     if (p === '/api/eyecatch/references') {
       const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
       if (!pr) return send(res, 200, { items: [] });
@@ -1110,9 +1164,48 @@ function registerPicked(pr) {
 }
 
 // 新しい記事（プロジェクト）を作る。同時に空の記事ファイルも用意します。
+// 記事ネタの状態を、実際の記事に合わせます。
+// リンク待ちから足したネタが、別のネタとして未着手のまま残ることがあるためです。
+// 変更があったときだけ true を返します。
+function syncIdeas(db) {
+  let changed = false;
+  (db.ideas || []).forEach((idea) => {
+    if (!idea.slug) return;
+    const a = articles.read(idea.slug);
+    if (!a) return;
+
+    // 状態を合わせるのは、この記事ネタから書いた記事だけです。
+    // URLが同じというだけのネタまで「公開」にすると、
+    // 同じテーマのネタが2つあるときに、どちらの話か分からなくなります。
+    const owner = db.projects.find((x) => x.slug === idea.slug);
+    const mine = owner ? owner.ideaId === idea.id : true;
+    const status = !mine ? idea.status
+      : a.meta.status === 'publish' ? '公開'
+      : a.body.trim() ? '作成中' : idea.status;
+    if (idea.status !== status) { idea.status = status; changed = true; }
+    // 記事と結び付けるのは、その記事が「このネタから書かれた」ときだけです。
+    // URLが同じというだけで結び付けると、同じテーマのネタが2つあるときに
+    // どちらが本物か分からなくなります。
+    if (!idea.projectId) {
+      const pr = db.projects.find((x) => x.slug === idea.slug
+        && (!x.ideaId || x.ideaId === idea.id));
+      if (pr) { idea.projectId = pr.id; changed = true; }
+    }
+  });
+  return changed;
+}
+
 function newProject(db, src) {
   const id = DB.newId();
-  const slug = articles.suggestSlug(src.slug || `article-${db.projects.length + 1}`);
+  // URLの決め方
+  //   1. 記事ネタやリンク待ちで決めてあれば、それを使う
+  //   2. 無ければキーワードやタイトルから作る（うさぎ トイレ → rabbit-toilet）
+  //   3. それも作れなければ article-2 のような仮のURLにして、画面で決め直してもらう
+  const hint = src.slug
+    || articles.slugFromJapanese(src.keyword || '')
+    || articles.slugFromJapanese(src.title || '')
+    || `article-${db.projects.length + 1}`;
+  const slug = articles.suggestSlug(hint);
   const pr = {
     id, slug,
     title: src.title || '', keyword: src.keyword || '', category: src.category || '',
