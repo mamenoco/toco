@@ -730,15 +730,14 @@ function buildExtras(published, ctx, extra) {
     ].join('\n'));
   }
 
-  // ワードプレス時代のURLの引き取り先。
-  // 旧サイトにあって新サイトに無いページは、そのままだと404になります。
-  // 数は少ないので、トップに送っておきます（301＝恒久的な引っ越し）。
-  write('_redirects', [
-    '/archive        /  301',
-    '/ranking-top20  /  301',
-    '/sample-page    /  301',
-    '',
-  ].join('\n'));
+  // ワードプレス時代のURLの引き取り先（一覧は site-config.js の redirects）。
+  // 上から順に見て、最初に一致した行が使われます。
+  const rules = config.redirects || [];
+  const width = rules.reduce((w, [from]) => Math.max(w, from.length), 0);
+  write('_redirects', rules
+    .map(([from, to]) => `${from.padEnd(width + 2)}${to}  301`)
+    .concat([''])
+    .join('\n'));
 
   // 検索結果ページ。中身はブラウザ側で search-index.json から組み立てます。
   // 検索結果そのものは検索エンジンに載せない（noindex, follow）のが通例です。

@@ -63,4 +63,54 @@ module.exports = {
   pagesDevHost: 'toco-17g.pages.dev',
 
   archivePerPage: 12,
+
+  // ---- WordPress時代のURLの引き取り先 ----
+  //
+  // 旧サイト（雑貨テーマ）のURLは、新サイトに対応するページがありません。
+  // 何もしないと404になるので、ここに書いた行が dist/_redirects になり、
+  // Cloudflare Pages が301（恒久的な引っ越し）で転送します。
+  //
+  // 一覧は Internet Archive に残っていた toco-to.com のURLから拾いました
+  // （2026-09-08 時点・記事17本ぶんは監査メモの本数と一致）。
+  // 中身がうさぎと無関係な旧記事なので、転送先はすべてトップにしています。
+  // 末尾の `*` は「その下の階層すべて」という意味です。
+  redirects: [
+    // 旧記事（/1534 のような数字だけのURL）
+    ['/58', '/'], ['/153', '/'], ['/259', '/'], ['/408', '/'],
+    ['/529', '/'], ['/632', '/'], ['/739', '/'], ['/856', '/'],
+    ['/976', '/'], ['/1033', '/'], ['/1148', '/'], ['/1239', '/'],
+    ['/1336', '/'], ['/1434', '/'], ['/1534', '/'], ['/1624', '/'],
+    ['/1729', '/'],
+
+    // 旧カテゴリ。food・house・column は新サイトにも同じURLがあるので触りません
+    ['/category/accessory', '/'], ['/category/accessory/*', '/'],
+    ['/category/beauty-health', '/'], ['/category/beauty-health/*', '/'],
+    ['/category/fashion', '/'], ['/category/fashion/*', '/'],
+    ['/category/goods', '/'], ['/category/goods/*', '/'],
+    ['/category/goout', '/'], ['/category/goout/*', '/'],
+    ['/category/handmade', '/'], ['/category/handmade/*', '/'],
+    ['/category/interior', '/'], ['/category/interior/*', '/'],
+    ['/category/kids-baby', '/'], ['/category/kids-baby/*', '/'],
+    ['/category/toy-2', '/'], ['/category/toy-2/*', '/'],
+
+    // 旧固定ページ
+    ['/archive', '/'],
+    ['/ranking-top20', '/'],
+    ['/sample-page', '/'],
+
+    // 投稿者ページ・一覧の2ページ目
+    ['/author/*', '/'],
+    ['/page/*', '/'],
+
+    // Yoast が出していたサイトマップ。新しいサイトマップに送ります
+    ['/sitemap_index.xml', '/sitemap.xml'],
+    ['/post-sitemap.xml', '/sitemap.xml'],
+    ['/page-sitemap.xml', '/sitemap.xml'],
+    ['/category-sitemap.xml', '/sitemap.xml'],
+    ['/author-sitemap.xml', '/sitemap.xml'],
+
+    // RSS
+    ['/feed', '/'],
+    ['/comments/feed', '/'],
+  ],
 };
