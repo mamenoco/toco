@@ -27,6 +27,100 @@
     }
   }
 
+  // ---- 検索結果ページ ----
+  // ヘッダーの検索窓は /search/?q=… に飛びます。
+  // 静的サイトなので検索する仕組みがサーバー側にありません。
+  // ビルド時に書き出した search-index.json を読んで、ブラウザ側で絞り込みます。
+  if (/^\/search\/?$/.test(location.pathname)) {
+    initSearchPage();
+  }
+
+  function normalize(text) {
+    var s = String(text || '');
+    // 全角の英数字・記号を半角にそろえてから比べます（ＵＳＡ → usa）
+    if (s.normalize) s = s.normalize('NFKC');
+    return s.toLowerCase();
+  }
+
+  function initSearchPage() {
+    var results = document.getElementById('search-results');
+    var summary = document.getElementById('search-summary');
+    var note = document.getElementById('search-note');
+    var input = document.getElementById('search-page-input');
+    if (!results || !summary) return;
+
+    var q = '';
+    try {
+      q = (new URLSearchParams(location.search).get('q') || '').trim();
+    } catch (e) { q = ''; }
+    if (input) input.value = q;
+    document.title = (q ? '「' + q + '」の検索結果' : '検索') + '｜tocoとくらし';
+
+    if (!q) {
+      summary.textContent = 'キーワードを入れて検索してください。';
+      if (note) note.hidden = false;
+      return;
+    }
+
+    summary.textContent = '検索しています…';
+
+    fetch('/search-index.json').then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (items) {
+      // 空白区切りのことばは、すべて含む記事だけを出します
+      var terms = normalize(q).split(/\s+/).filter(Boolean);
+      var hits = items.filter(function (a) {
+        var hay = normalize([a.t, a.d, a.c].join(' '));
+        return terms.every(function (t) { return hay.indexOf(t) !== -1; });
+      });
+
+      summary.textContent = hits.length
+        ? '「' + q + '」の検索結果：' + hits.length + '件'
+        : '「' + q + '」に一致する記事は見つかりませんでした。';
+      if (note) note.hidden = hits.length > 0;
+
+      hits.forEach(function (a) { results.appendChild(resultCard(a)); });
+    }).catch(function () {
+      summary.textContent = '検索できませんでした。時間をおいて試してみてください。';
+      if (note) note.hidden = false;
+    });
+  }
+
+  // 一覧ページのカードと同じ形で組み立てます。
+  // 検索語がそのまま入るので、HTMLではなく textContent で入れています。
+  function resultCard(a) {
+    var card = document.createElement('article');
+    card.className = 'archive-card';
+
+    var link = document.createElement('a');
+    link.href = a.u;
+
+    var img = document.createElement('img');
+    img.src = a.g;
+    img.alt = '';
+    img.loading = 'lazy';
+    link.appendChild(img);
+
+    var body = document.createElement('div');
+    var time = document.createElement('time');
+    if (a.iso) time.dateTime = a.iso;
+    time.textContent = a.dt || '';
+    var title = document.createElement('h2');
+    title.textContent = a.t;
+    body.appendChild(time);
+    body.appendChild(title);
+    if (a.d) {
+      var desc = document.createElement('p');
+      desc.textContent = a.d;
+      body.appendChild(desc);
+    }
+    link.appendChild(body);
+
+    card.appendChild(link);
+    return card;
+  }
+
   // ---- アフィリエイトボタンのクリック計測（フェーズ2で商品カードが入ったら効きます） ----
   document.addEventListener('click', function (e) {
     var a = e.target.closest ? e.target.closest('.pd-btn') : null;

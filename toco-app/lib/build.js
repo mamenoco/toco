@@ -281,6 +281,25 @@ function buildAssets() {
         '.category-section{padding-top:52px}',
         '@media(max-width:600px){.category-section{padding-top:46px}}',
       ].join(''),
+      // 検索結果ページ
+      [
+        '.archive-header .search-page-form{display:flex;max-width:520px;height:44px;margin:18px 0 0}',
+        '.search-page-form input{flex:1;min-width:0;padding:0 18px;border:1px solid var(--line);',
+        'border-right:0;border-radius:999px 0 0 999px;outline:0;background:#fff;font-size:14px}',
+        '.search-page-form input:focus{border-color:var(--pink)}',
+        '.search-page-form button{width:96px;border:0;border-radius:0 999px 999px 0;color:#fff;',
+        'background:var(--pink);font-size:13px;font-weight:600;cursor:pointer}',
+        '.search-summary{margin:16px 0 24px;color:var(--text);font-size:13px}',
+        '.search-note{margin-top:8px;padding:22px 24px;border:1px solid var(--line);',
+        'border-radius:16px;background:#fffdfa}',
+        '.search-note p{margin:0 0 14px;font-size:13px}',
+        '.search-cats{display:flex;flex-wrap:wrap;gap:9px}',
+        '.search-cats a{padding:8px 15px;border:1px solid #eadfd9;border-radius:999px;',
+        'background:#fff;font-size:12px;text-decoration:none;transition:box-shadow .2s ease}',
+        '.search-cats a:hover{box-shadow:var(--shadow)}',
+        '@media(max-width:600px){.archive-header .search-page-form{height:42px}',
+        '.search-page-form button{width:76px}.search-note{padding:18px 16px}}',
+      ].join(''),
       // 記事末の「同じカテゴリの記事」
       [
         '.related-posts{margin-top:52px;padding-top:34px;border-top:1px solid var(--line)}',
@@ -721,9 +740,19 @@ function buildExtras(published, ctx, extra) {
     '',
   ].join('\n'));
 
+  // 検索結果ページ。中身はブラウザ側で search-index.json から組み立てます。
+  // 検索結果そのものは検索エンジンに載せない（noindex, follow）のが通例です。
+  const catLinks = config.categories
+    .map((c) => `<a href="/category/${esc(c.slug)}/">${esc(c.name)}</a>`).join('');
+  write('search/index.html', layout({
+    path: '/search/', title: '検索結果', noindex: true, bodyClass: 'archive search',
+    content: fill(readTpl('search.html'), { CATLINKS: catLinks }), ...ctx,
+  }));
+
   // 検索用のインデックス
   write('search-index.json', JSON.stringify(published.map((a) => ({
-    t: a.title, u: `/${a.slug}/`, c: a.category, d: a.description,
+    t: a.title, u: `/${a.slug}/`, c: categoryOf(a.category).name, d: a.description,
+    g: cardImage(a), dt: formatDate(a.date), iso: a.date,
   }))));
 }
 
