@@ -276,6 +276,34 @@ function buildAssets() {
         '.entry-content .related-link .rel-text em{display:block;margin-top:3px;color:#a3968f;',
         'font-size:11px;font-style:normal;line-height:1.6}',
       ].join(''),
+      // メインビジュアルはスライダーではないので丸印を外した。その高さぶんの余白を足す
+      [
+        '.category-section{padding-top:52px}',
+        '@media(max-width:600px){.category-section{padding-top:46px}}',
+      ].join(''),
+      // 記事末の「同じカテゴリの記事」
+      [
+        '.related-posts{margin-top:52px;padding-top:34px;border-top:1px solid var(--line)}',
+        '.related-posts h2{margin:0 0 22px;padding:0;border:0;background:none;',
+        'font-family:"Zen Maru Gothic",sans-serif;font-size:20px;letter-spacing:.04em;text-align:center}',
+        '.related-posts h2::before{content:"";display:inline-block;width:26px;height:26px;',
+        'margin-right:9px;vertical-align:-6px;',
+        "background:url('../images/flower-sprig.png') center/contain no-repeat}",
+        '.related-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}',
+        // 2件・1件のときに余白が右に寄らないよう、列数を合わせる
+        '.related-grid:not(:has(> :nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}',
+        '.related-grid:not(:has(> :nth-child(2))){grid-template-columns:minmax(0,340px);justify-content:center}',
+        '.related-posts .archive-card h3{margin:5px 0 0;font-size:14px;line-height:1.6}',
+        '.related-posts .archive-card div{padding:14px}',
+        '.related-posts .wide-pink-button{margin-top:26px}',
+        '@media(max-width:900px){.related-grid{grid-template-columns:1fr 1fr}}',
+        '@media(max-width:600px){.related-posts{margin-top:38px;padding-top:26px}',
+        '.related-posts h2{font-size:17px}',
+        '.related-grid{grid-template-columns:1fr;gap:14px}',
+        '.related-posts .archive-card{display:grid;grid-template-columns:120px 1fr;align-items:center}',
+        '.related-posts .archive-card img{height:100%;aspect-ratio:1.25}',
+        '.related-posts .archive-card h3{font-size:13px}}',
+      ].join(''),
       // ピックアップのカテゴリ札。掲載順ではなくカテゴリごとに色を決める
       [
         '.pickup-card .pickup-image span{color:#fff;background:rgba(232,138,155,.92)}',
@@ -485,6 +513,27 @@ function makeLinkResolver(ctx) {
   };
 }
 
+// 記事の下に出す「同じカテゴリの記事」。新しい順に最大3件、自分自身は除く
+function relatedPosts(a, ctx) {
+  const list = (ctx.published || [])
+    .filter((x) => x.category === a.category && x.slug !== a.slug)
+    .slice(0, 3);
+  if (!list.length) return '';
+  const cat = categoryOf(a.category);
+  const cards = list.map((x) => `<article class="archive-card"><a href="/${esc(x.slug)}/">
+    <img src="${esc(cardImage(x))}" alt="" loading="lazy">
+    <div><time datetime="${esc(x.date)}">${formatDate(x.date)}</time><h3>${esc(x.title)}</h3></div>
+  </a></article>`).join('\n');
+  return `        <section class="related-posts" aria-labelledby="related-posts-heading">
+            <h2 id="related-posts-heading">${esc(cat.name)}の記事</h2>
+            <div class="related-grid">
+${cards}
+            </div>
+            <a class="wide-pink-button" href="/category/${esc(cat.slug)}/">${esc(cat.name)}の記事をもっと見る</a>
+        </section>
+`;
+}
+
 function buildSingle(a, prev, next, ctx) {
   const cat = categoryOf(a.category);
   const md = replaceLegacyProductLines(a.body);
@@ -514,6 +563,7 @@ function buildSingle(a, prev, next, ctx) {
     DATE: formatDate(a.date), DATEISO: esc(a.date),
     HERO: hero, TOC: '', BODY: body,
     PREV: link(prev, 'previous', 'prev'), NEXT: link(next, 'next', 'next'),
+    RELATED: relatedPosts(a, ctx),
   });
 
   const banner = ctx.draft
@@ -709,6 +759,8 @@ function build(opts) {
   loadMarkdownDir(PAGES, 'page').forEach((p) => {
     ctx.bySlug[p.slug] = Object.assign({}, p, { status: 'publish' });
   });
+
+  ctx.published = published;
 
   published.forEach((a, i) => buildSingle(a, published[i + 1], published[i - 1], ctx));
   drafts.forEach((a) => buildSingle(a, null, null, Object.assign({}, ctx, { draft: true })));

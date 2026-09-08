@@ -21,7 +21,8 @@ module.exports = {
   // 旧テーマの toco_primary_menu_fallback と同じ内容
   menu: [
     ['ホーム', '/'],
-    ['はじめての方へ', '/#beginner'],
+    // 独立したページがあるので、トップの案内バナー（/#beginner）ではなく本体へ送ります
+    ['はじめての方へ', '/beginner/'],
     ['カテゴリから探す', '/#categories'],
     ['コラム', '/#column'],
     ['おすすめ商品', '/#pickup'],
