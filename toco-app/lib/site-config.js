@@ -25,7 +25,6 @@ module.exports = {
     ['はじめての方へ', '/beginner/'],
     ['カテゴリから探す', '/#categories'],
     ['コラム', '/#column'],
-    ['おすすめ商品', '/#pickup'],
     ['お問い合わせ', '/contact/'],
   ],
 

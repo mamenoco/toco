@@ -289,20 +289,21 @@ function buildAssets() {
         '.related-posts h2::before{content:"";display:inline-block;width:26px;height:26px;',
         'margin-right:9px;vertical-align:-6px;',
         "background:url('../images/flower-sprig.png') center/contain no-repeat}",
-        '.related-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}',
-        // 2件・1件のときに余白が右に寄らないよう、列数を合わせる
-        '.related-grid:not(:has(> :nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}',
-        '.related-grid:not(:has(> :nth-child(2))){grid-template-columns:minmax(0,340px);justify-content:center}',
+        '.related-grid{display:grid;grid-template-columns:1fr;gap:18px}',
         '.related-posts .archive-card h3{margin:5px 0 0;font-size:14px;line-height:1.6}',
         '.related-posts .archive-card div{padding:14px}',
-        '.related-posts .wide-pink-button{margin-top:26px}',
-        '@media(max-width:900px){.related-grid{grid-template-columns:1fr 1fr}}',
+        // ボタンの文言はカテゴリ名ぶん長くなるので、幅を中身に合わせる
+        '.related-posts .wide-pink-button{width:auto;max-width:100%;height:auto;min-height:42px;',
+        'padding:11px 26px;margin-top:26px;justify-self:center;line-height:1.6;text-align:center}',
+        '@media(min-width:601px){',
+        '.related-grid{grid-template-columns:repeat(3,minmax(0,1fr))}',
+        // 2件・1件のときに余白が右に寄らないよう、列数を合わせる
+        '.related-grid:not(:has(> :nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}',
+        '.related-grid:not(:has(> :nth-child(2))){grid-template-columns:minmax(0,340px);',
+        'justify-content:center}}',
         '@media(max-width:600px){.related-posts{margin-top:38px;padding-top:26px}',
         '.related-posts h2{font-size:17px}',
-        '.related-grid{grid-template-columns:1fr;gap:14px}',
-        '.related-posts .archive-card{display:grid;grid-template-columns:120px 1fr;align-items:center}',
-        '.related-posts .archive-card img{height:100%;aspect-ratio:1.25}',
-        '.related-posts .archive-card h3{font-size:13px}}',
+        '.related-grid{gap:14px}}',
       ].join(''),
       // ピックアップのカテゴリ札。掲載順ではなくカテゴリごとに色を決める
       [
