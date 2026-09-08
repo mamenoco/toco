@@ -374,6 +374,10 @@ async function openProject(id, wantStep, keepHash) {
   $('#checkStatus').innerHTML = '';
   $('#checkSolved').innerHTML = '';
   CHECKS = []; PREV_LABELS = null;
+  // 前に開いていた記事のプレビューを消します。
+  // 残しておくと、別の記事を開いたときに一瞬だけ前の記事が見えてしまいます。
+  $('#previewFrame').srcdoc = '';
+  PREVIEW_OF = '';
 
   fillMetaForm();
   renderPicked();
@@ -396,7 +400,10 @@ $('#btnDeleteProject').addEventListener('click', async () => {
 
 function gotoStep(n) {
   if (CURRENT) setHash(`edit/${CURRENT.id}/${n}`);
-  if (String(n) === '3' && CURRENT && !$('#previewFrame').srcdoc) renderPreview({});
+  // 中身が無いときだけでなく、前に見ていた記事と違うときも作り直します。
+  // ここを見落とすと、別の記事を開いたのに前の記事が表示されたままになります。
+  if (String(n) === '3' && CURRENT
+    && (!$('#previewFrame').srcdoc || PREVIEW_OF !== CURRENT.id)) renderPreview({});
   // 公開前の段階に入ったら、本文に合ったタイトルと説明文を用意しておきます
   if ((String(n) === '3' || String(n) === '4') && CURRENT && META_TRIED !== CURRENT.id) {
     const rough = !looksLikeArticleTitle($('#pubTitle').value) || !$('#pubDesc').value.trim();
@@ -1019,9 +1026,14 @@ $('#articleText').addEventListener('blur', renderPlaceholders);
 
 // opts.keepScroll … 読み込み直しても、いま見ている位置に戻します
 // opts.skipBuild  … CSSが変わらないときはビルドを省きます（装飾の付け外しなど）
+// いま画面に出ているプレビューが、どの記事のものか。
+// 別の記事を開いたのに前の記事が残る、という取り違えを防ぐために持っています。
+let PREVIEW_OF = '';
+
 async function renderPreview(opts) {
   const o = opts || {};
   const f = $('#previewFrame');
+  PREVIEW_OF = CURRENT ? CURRENT.id : '';
   const keep = o.keepScroll && f.contentWindow ? f.contentWindow.scrollY : 0;
 
   await saveProject({ article: $('#articleText').value });

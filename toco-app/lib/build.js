@@ -167,7 +167,7 @@ function cardImage(article) {
 function pickupCard(a) {
   const cat = categoryOf(a.category);
   return `<article class="pickup-card">
-  <a class="pickup-image" href="/${esc(a.slug)}/"><img src="${esc(cardImage(a))}" alt="" loading="lazy"><span>${esc(cat.name)}</span></a>
+  <a class="pickup-image" href="/${esc(a.slug)}/"><img src="${esc(cardImage(a))}" alt="" loading="lazy"><span class="cat-tag cat-${esc(cat.slug || 'other')}">${esc(cat.name)}</span></a>
   <h3><a href="/${esc(a.slug)}/">${esc(a.title)}</a></h3>
   <time datetime="${esc(a.date)}">${formatDate(a.date)}</time>
 </article>`;
@@ -176,7 +176,7 @@ function pickupCard(a) {
 function columnRow(a) {
   return `<a class="column-row" href="/${esc(a.slug)}/">
   <img src="${esc(cardImage(a))}" alt="" loading="lazy">
-  <span><strong>${esc(a.title)}</strong><p>${esc(a.description)}</p><time datetime="${esc(a.date)}">${formatDate(a.date)}</time></span><i>›</i>
+  <span><strong>${esc(a.title)}</strong><time datetime="${esc(a.date)}">${formatDate(a.date)}</time></span><i aria-hidden="true"></i>
 </a>`;
 }
 
@@ -275,6 +275,23 @@ function buildAssets() {
         'font-size:13px;font-weight:600;line-height:1.55}',
         '.entry-content .related-link .rel-text em{display:block;margin-top:3px;color:#a3968f;',
         'font-size:11px;font-style:normal;line-height:1.6}',
+      ].join(''),
+      // ピックアップのカテゴリ札。掲載順ではなくカテゴリごとに色を決める
+      [
+        '.pickup-card .pickup-image span{color:#fff;background:rgba(228,142,154,.9)}',
+        '.pickup-card .pickup-image span.cat-food{background:rgba(228,142,154,.9)}',
+        '.pickup-card .pickup-image span.cat-house{background:rgba(197,159,102,.92)}',
+        '.pickup-card .pickup-image span.cat-toy{background:rgba(143,166,103,.9)}',
+        '.pickup-card .pickup-image span.cat-care{background:rgba(166,142,173,.9)}',
+        '.pickup-card .pickup-image span.cat-life{background:rgba(206,150,124,.92)}',
+        '.pickup-card .pickup-image span.cat-column{background:rgba(150,166,158,.92)}',
+      ].join(''),
+      // コラム一覧の矢印。文字の「›」は円の中で右下にずれるので、線で描き直す
+      [
+        '.column-row i{font-size:0;line-height:0}',
+        '.column-row i::before{content:"";width:6px;height:6px;',
+        'border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;',
+        'transform:translateX(-2px) rotate(45deg)}',
       ].join(''),
       // よくある質問の見出し
       '.entry-content h3.faq-q::before{content:"Q. ";color:var(--pink-dark);font-weight:700}',
