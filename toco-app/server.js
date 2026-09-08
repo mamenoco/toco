@@ -55,6 +55,7 @@ const products = require('./lib/products.js');
 const curate = require('./lib/curate.js');
 const links = require('./lib/links.js');
 const pages = require('./lib/pages.js');
+const ideaAI = require('./lib/idea-ai.js');
 const similarity = require('./lib/similarity.js');
 const imageAI = require('./lib/image-ai.js');
 const translate = require('./lib/translate.js');
@@ -388,6 +389,95 @@ const server = http.createServer(async (req, res) => {
       }
       DB.saveDb(db);
       return send(res, 200, { ok: true, ideas: db.ideas });
+    }
+
+    // 記事ネタの候補を出す。ここでは登録せず、画面で選んでもらいます。
+    if (p === '/api/ideas/suggest') {
+      db.ideas = db.ideas || DB.seedIdeas();
+      const artList = articles.list();
+      const pending = links.scan()
+        .filter((x) => x.status === 'missing')
+        .map((x) => ({ slug: x.slug, labels: x.labels }));
+      try {
+        const raw = await ideaAI.suggest({
+          count: Math.min(Math.max(Number(body.count) || 20, 1), 60),
+          kind: body.kind || 'both',
+          hint: String(body.hint || '').trim(),
+          categories: siteConfig.categories.map((c) => c.name),
+          ideas: db.ideas.map((i) => ({ title: i.title, keyword: i.keyword })),
+          // 固定ページも既存の内容です。入れないと「はじめての方へ」と
+          // 同じ趣旨のネタが候補に出てきます。
+          articles: artList.map((a) => ({ title: a.title, slug: a.slug }))
+            .concat(pages.list().map((pg) => ({ title: pg.title, slug: pg.slug }))),
+          pending,
+          model: settings.aiModel,
+        });
+
+        // すでにあるものは落とします。AIに任せきりにすると重複が混ざるためです。
+        const haveKw = new Set(db.ideas.map((i) => i.keyword).filter(Boolean));
+        const haveTitle = new Set(db.ideas.map((i) => i.title));
+        const haveSlug = new Set(
+          db.ideas.map((i) => i.slug).filter(Boolean)
+            .concat(artList.map((a) => a.slug))
+            .concat(pages.list().map((pg) => pg.slug))
+        );
+        const seen = new Set();
+        const items = raw.filter((x) => {
+          if (haveKw.has(x.keyword) || haveTitle.has(x.title)) return false;
+          if (x.slug && (haveSlug.has(x.slug) || seen.has(x.slug))) return false;
+          if (x.slug) seen.add(x.slug);
+          return true;
+        }).map((x) => Object.assign(x, {
+          // 本文からすでにリンクされているものは、書けばリンクがつながります
+          linked: pending.some((pd) => pd.slug === x.slug),
+        }));
+
+        return send(res, 200, { ok: true, items, dropped: raw.length - items.length });
+      } catch (e) {
+        return send(res, 200, { error: String(e.message || e) });
+      }
+    }
+
+    // 候補のキーワードで、楽天にうさぎ用の商品があるかを見ます。
+    // コラムには商品が要らないので、商品紹介の候補にだけ使います。
+    if (p === '/api/ideas/market') {
+      if (!settings.rakutenAppId) return send(res, 200, { error: '楽天APIの設定がありません' });
+      try {
+        const items = await research.rakutenSearch(settings.rakutenAppId,
+          settings.rakutenAccessKey, String(body.keyword || ''), 30, 1,
+          { ng: '犬 猫 ステッカー Tシャツ 財布 シール' });
+        const only = (items || []).filter((x) => /うさぎ|ウサギ|ラビット|小動物/.test(x.name || ''));
+        return send(res, 200, {
+          ok: true,
+          count: only.length,
+          reviews: only.reduce((a, x) => a + (x.reviewCount || 0), 0),
+          top: only.slice(0, 3).map((x) => ({ name: x.name, reviewCount: x.reviewCount || 0 })),
+        });
+      } catch (e) {
+        return send(res, 200, { error: String(e.message || e) });
+      }
+    }
+
+    // 選んだ候補をまとめて登録する
+    if (p === '/api/ideas/add-suggested') {
+      db.ideas = db.ideas || DB.seedIdeas();
+      const added = [];
+      (body.items || []).forEach((x) => {
+        const slug = String(x.slug || '').trim();
+        db.ideas.push({
+          id: DB.newId(),
+          title: String(x.title || '').trim(),
+          keyword: String(x.keyword || '').trim(),
+          category: String(x.category || '').trim(),
+          slug: articles.isValidSlug(slug) ? slug : '',
+          priority: ['高', '中', '低'].includes(x.priority) ? x.priority : '中',
+          note: String(x.note || '').trim(),
+          status: '未着手', projectId: null,
+        });
+        added.push(x.title);
+      });
+      DB.saveDb(db);
+      return send(res, 200, { ok: true, added: added.length, ideas: db.ideas });
     }
 
     if (p === '/api/ideas/add-many') {

@@ -60,6 +60,7 @@
   <div class="vh"><h1>記事ネタ</h1><span class="sub" id="ideaCount"></span>
     <span class="spacer"></span>
     <button class="ghost" id="btnIdeaBulk">まとめて追加</button>
+    <button class="ghost" id="btnIdeaAI">AIでネタを出す</button>
     <button class="primary" id="btnIdeaNew">ネタを追加</button></div>
   <div class="card">
     <div class="row">
@@ -68,6 +69,27 @@
       <select id="fPriority"><option value="">優先度 すべて</option><option>高</option><option>中</option><option>低</option></select>
     </div>
   </div>
+  <div class="card" id="ideaAIBox" hidden>
+    <h3>AIでネタを出す</h3>
+    <p class="note">いまある記事ネタ・公開ずみの記事・リンク待ちを全部見せたうえで、
+      まだ書いていないテーマを挙げてもらいます。<b>出しただけでは登録されません。</b>
+      選んだものだけが記事ネタに入ります。</p>
+    <div class="inline">
+      <label>件数<input id="iaCount" type="number" value="20" min="1" max="60" style="width:80px"></label>
+      <label>種類<select id="iaKind">
+        <option value="both">商品紹介とコラムの両方</option>
+        <option value="column">コラムだけ</option>
+        <option value="product">商品紹介だけ</option>
+      </select></label>
+      <button class="primary" id="btnIaRun">出す</button>
+      <button class="ghost" id="btnIaClose">閉じる</button>
+    </div>
+    <label>希望があれば（任意）<input id="iaHint"
+      placeholder="例：夏に読まれるものを多めに／お迎え直後の人向けを中心に"></label>
+    <p class="note" id="iaNote"></p>
+    <div id="iaResult"></div>
+  </div>
+
   <div id="ideaList"></div>
 </section>
 

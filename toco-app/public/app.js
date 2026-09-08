@@ -2665,3 +2665,110 @@ $('#btnPgPreviewOpen').addEventListener('click', () => {
 });
 
 $('#btnBackPages').addEventListener('click', () => show('pages'));
+
+// ================================================================
+// 記事ネタをAIに出してもらう
+// ================================================================
+// 出しただけでは登録しません。画面で選んだものだけを記事ネタに入れます。
+// 商品紹介の候補は、楽天に実際にうさぎ用の商品があるかをその場で確かめられます。
+// （コラムは商品が無くても成り立つので、確かめる対象にしません）
+
+let IA_ITEMS = [];
+
+$('#btnIdeaAI').addEventListener('click', () => {
+  const box = $('#ideaAIBox');
+  box.hidden = false;
+  box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
+$('#btnIaClose').addEventListener('click', () => {
+  $('#ideaAIBox').hidden = true;
+  $('#iaResult').innerHTML = '';
+  $('#iaNote').textContent = '';
+  IA_ITEMS = [];
+});
+
+$('#btnIaRun').addEventListener('click', async () => {
+  $('#btnIaRun').disabled = true;
+  $('#iaResult').innerHTML = '';
+  $('#iaNote').innerHTML = '<span class="spin"></span>いまある記事を読んで考えています（30秒〜2分ほど）…';
+  try {
+    const r = await api('ideas/suggest', {
+      count: Number($('#iaCount').value) || 20,
+      kind: $('#iaKind').value,
+      hint: $('#iaHint').value.trim(),
+    });
+    IA_ITEMS = r.items || [];
+    $('#iaNote').textContent = IA_ITEMS.length
+      ? `${IA_ITEMS.length}件の候補です。${r.dropped ? `すでにあるもの${r.dropped}件は除きました。` : ''}`
+      : 'すべて既存と重なっていました。件数を増やすか、希望を書いてお試しください。';
+    renderIaResult();
+  } catch (e) {
+    $('#iaNote').textContent = '';
+  } finally { $('#btnIaRun').disabled = false; }
+});
+
+function renderIaResult() {
+  if (!IA_ITEMS.length) { $('#iaResult').innerHTML = ''; return; }
+  $('#iaResult').innerHTML = `
+    <div class="row" style="margin:10px 0">
+      <button class="ghost" id="iaAll">すべて選ぶ</button>
+      <button class="ghost" id="iaNone">すべて外す</button>
+      <button class="ghost" id="iaMarket">商品紹介の候補を楽天で調べる</button>
+      <span class="spacer"></span>
+      <button class="primary" id="iaAdd">選んだものを記事ネタに追加</button>
+    </div>
+    <table class="tbl"><tbody>
+    ${IA_ITEMS.map((x, i) => `<tr>
+      <td style="width:34px"><input type="checkbox" data-ia="${i}" checked></td>
+      <td class="t">${esc(x.title)}
+        ${x.linked ? ' <span class="tag ok">リンク待ち</span>' : ''}
+        <span class="tag">${esc(x.priority)}</span>
+        <div class="note" style="margin:2px 0 0">${esc(x.category)}　${esc(x.keyword)}　/${esc(x.slug)}/</div>
+        <div class="note" style="margin:2px 0 0">${esc(x.note)}</div>
+        <div class="note" id="iaMk${i}" style="margin:3px 0 0"></div></td>
+    </tr>`).join('')}</tbody></table>`;
+
+  $('#iaAll').onclick = () => $$('[data-ia]').forEach((c) => { c.checked = true; });
+  $('#iaNone').onclick = () => $$('[data-ia]').forEach((c) => { c.checked = false; });
+  $('#iaMarket').onclick = checkIaMarket;
+  $('#iaAdd').onclick = addIaSelected;
+}
+
+// 商品紹介の候補について、楽天にうさぎ用の商品があるかを順に見ます。
+// 続けて呼ぶと楽天に負担がかかるので、1件ずつ間隔を空けます。
+async function checkIaMarket() {
+  const targets = IA_ITEMS.map((x, i) => ({ x, i })).filter((t) => t.x.category !== 'コラム');
+  if (!targets.length) return toast('商品紹介の候補がありません');
+  $('#iaMarket').disabled = true;
+  for (const t of targets) {
+    const cell = $('#iaMk' + t.i);
+    cell.innerHTML = '<span class="spin"></span>調べています…';
+    try {
+      const r = await api('ideas/market', { keyword: t.x.keyword });
+      if (r.error) { cell.textContent = ''; continue; }
+      // 口コミが少ないものは、記事にしても選ぶ材料が集まりません
+      const weak = r.count < 5 || r.reviews < 20;
+      cell.innerHTML = `<span style="color:${weak ? 'var(--err)' : 'var(--mute)'}">`
+        + `楽天にうさぎ用 ${r.count}件・口コミ計 ${r.reviews}`
+        + (weak ? '（少なめ。記事にするには材料が足りないかもしれません）' : '')
+        + '</span>';
+    } catch (e) { cell.textContent = ''; }
+    await new Promise((r2) => setTimeout(r2, 1200));
+  }
+  $('#iaMarket').disabled = false;
+  toast('調べ終わりました');
+}
+
+async function addIaSelected() {
+  const picked = $$('[data-ia]').filter((c) => c.checked).map((c) => IA_ITEMS[Number(c.dataset.ia)]);
+  if (!picked.length) return toast('追加するものを選んでください');
+  const r = await api('ideas/add-suggested', { items: picked });
+  if (r.error) return;
+  await refresh();
+  $('#ideaAIBox').hidden = true;
+  $('#iaResult').innerHTML = '';
+  $('#iaNote').textContent = '';
+  IA_ITEMS = [];
+  renderIdeas();
+  toast(`${r.added}件を記事ネタに追加しました`);
+}
