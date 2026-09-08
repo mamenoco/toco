@@ -20,8 +20,28 @@ function esc(s) {
 let LINK_RESOLVER = null;
 let LINK_CARDS = [];
 
+// 「うさぎと暮らして◯年」の◯を、今の日付から計算します。
+// 記事を書いた時点で数字を焼き付けてしまうと、年が変わっても古いままになるためです。
+// since は 'YYYY-MM' か 'YYYY-MM-DD'。満年数（切り捨て）を返します。
+function yearsSince(since, now) {
+  const m = String(since || '').match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (!m) return null;
+  const from = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3] || 1));
+  const to = now || new Date();
+  let y = to.getFullYear() - from.getFullYear();
+  const beforeAnniversary = to.getMonth() < from.getMonth()
+    || (to.getMonth() === from.getMonth() && to.getDate() < from.getDate());
+  if (beforeAnniversary) y -= 1;
+  return y < 0 ? 0 : y;
+}
+
+// {{years}} をいまの年数に置き換えます。render() のあいだだけ差し込みます。
+let YEARS = null;
+
 function inline(t) {
   return t
+    // うさぎと暮らして何年か。書き出すたびに計算し直されます。
+    .replace(/\{\{years\}\}/g, () => (YEARS == null ? '' : String(YEARS)))
     // まだ書いていない記事へのリンク。記事ができたら自動でリンクに変わります。
     .replace(/\{\{link:([^}|]+)(?:\|([^}]*))?\}\}/g, (m, slug, label) => {
       const s = slug.trim();
@@ -63,6 +83,7 @@ function render(md, opts) {
   const product = options.product || ((id) => `<!-- product not found: ${esc(id)} -->`);
   const ranking = options.ranking || (() => '');
   const card = options.card || (() => '');
+  YEARS = options.years != null ? options.years : null;
   LINK_RESOLVER = options.link || null;
   LINK_CARDS = [];
   const pendingLinks = [];
@@ -321,4 +342,5 @@ function buildToc(headings) {
     + '</div>';
 }
 
-module.exports = { render, esc, inline };
+module.exports = {
+  yearsSince, render, esc, inline };

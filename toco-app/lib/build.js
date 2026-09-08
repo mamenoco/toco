@@ -539,6 +539,8 @@ function buildSingle(a, prev, next, ctx) {
   const cat = categoryOf(a.category);
   const md = replaceLegacyProductLines(a.body);
   const r = markdown.render(md, {
+    // うさぎと暮らして何年か。書き出すたびに計算し直します。
+    years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
@@ -593,6 +595,8 @@ function contactForm() {
 
 function buildPage(p, ctx) {
   const r = markdown.render(p.body, {
+    // うさぎと暮らして何年か。書き出すたびに計算し直します。
+    years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),
@@ -798,6 +802,8 @@ function renderArticle(md, opts) {
     ctx.bySlug[p.slug] = Object.assign({}, p, { status: 'publish' });
   });
   const r = markdown.render(String(md || ''), {
+    // うさぎと暮らして何年か。書き出すたびに計算し直します。
+    years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
     link: makeLinkResolver(ctx),

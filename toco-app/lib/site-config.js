@@ -8,6 +8,11 @@ module.exports = {
   url: 'https://toco-to.com',
   lang: 'ja',
 
+  // うさぎを迎えた月。本文の {{years}} が、ここからの年数に置き換わります。
+  // 「うさぎと暮らして{{years}}年になりますが、」と書いておけば、
+  // サイトを書き出すたびに数字が今の年数に更新されます。
+  rabbitSince: '2024-04',
+
   // front-page.php のカテゴリ定義と同じ並び順
   categories: [
     { slug: 'food',   name: 'えさ・牧草',       lead: '主食からおやつまで<br>選び方やおすすめを紹介' },
