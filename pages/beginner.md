@@ -2,6 +2,7 @@
 title: はじめての方へ｜うさぎを迎える前に知っておきたいことと、そろえるもの
 slug: beginner
 date: 2026-09-03
+eyecatch: /assets/eyecatch/beginner.jpg
 description: うさぎを迎える前に知っておきたい基礎知識と、当日までにそろえるもののチェックリスト。費用の目安や動物病院の探し方まで、順を追ってまとめました。
 ---
 # はじめての方へ

@@ -648,6 +648,8 @@ function buildPage(p, ctx) {
   const content = fill(readTpl('page.html'), { TITLE: esc(p.title), TOC: '', BODY: body });
   write(`${p.slug}/index.html`, layout({
     path: `/${p.slug}/`, title: p.title, description: p.description,
+    // ページにもアイキャッチを反映します。SNSで共有したときの画像になります。
+    image: p.eyecatch,
     bodyClass: 'page', content, ...ctx,
   }));
 }
