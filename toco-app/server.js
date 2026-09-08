@@ -54,6 +54,7 @@ const affiliate = require('./lib/affiliate.js');
 const products = require('./lib/products.js');
 const curate = require('./lib/curate.js');
 const links = require('./lib/links.js');
+const pages = require('./lib/pages.js');
 const similarity = require('./lib/similarity.js');
 const imageAI = require('./lib/image-ai.js');
 const translate = require('./lib/translate.js');
@@ -479,6 +480,49 @@ const server = http.createServer(async (req, res) => {
         });
       }
       return send(res, 200, { targets: list });
+    }
+
+    // ===== 固定ページ =====
+    // 「はじめての方へ」のように、公開したあとも記事リンクを足していくページです。
+    if (p === '/api/pages') {
+      return send(res, 200, { pages: pages.list() });
+    }
+
+    if (p === '/api/page/get') {
+      const pg = pages.read(u.searchParams.get('slug') || '');
+      if (!pg) return send(res, 200, { error: 'ページが見つかりません' });
+      return send(res, 200, {
+        page: {
+          slug: pg.slug,
+          title: pg.meta.title || '',
+          description: pg.meta.description || '',
+          body: pg.body,
+          protectedPage: pages.PROTECTED.includes(pg.slug),
+        },
+      });
+    }
+
+    if (p === '/api/page/save') {
+      const slug = String(body.slug || '').trim();
+      const cur = pages.read(slug);
+      if (!cur) return send(res, 200, { error: 'ページが見つかりません' });
+      try {
+        const saved = pages.save(slug, {
+          title: String(body.title || '').trim(),
+          description: String(body.description || '').trim(),
+        }, String(body.body == null ? cur.body : body.body));
+        return send(res, 200, { ok: true, page: { slug: saved.slug, chars: saved.body.length } });
+      } catch (e) {
+        return send(res, 200, { error: String(e.message || e) });
+      }
+    }
+
+    // ページの本文を、公開前チェックと同じ見た目で描きます
+    if (p === '/api/page/preview') {
+      const cur = pages.read(String(body.slug || ''));
+      if (!cur) return send(res, 200, { error: 'ページが見つかりません' });
+      const md = body.body == null ? cur.body : String(body.body);
+      return send(res, 200, { html: loadBuilder().renderArticle(md, {}).html });
     }
 
     // ===== 記事内リンクの待ち行列 =====

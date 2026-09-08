@@ -40,6 +40,7 @@ const RENDER = {
   home: renderHome, ideas: renderIdeas, articles: renderArticles,
   products: renderProducts, inventory: renderInventory,
   publish: renderPublish, settings: renderSettings, video: renderVideo,
+  pages: renderPages,
 };
 
 function show(view, keepHash) {
@@ -48,6 +49,7 @@ function show(view, keepHash) {
   $('#view-' + view).classList.add('on');
   $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.view === view));
   if (view === 'editor') $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.view === 'articles'));
+  if (view === 'page-edit') $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.view === 'pages'));
   if (RENDER[view]) RENDER[view]();
   window.scrollTo(0, 0);
 }
@@ -2516,3 +2518,134 @@ $('#btnPingAi').addEventListener('click', async () => {
   if (location.hash.length > 1) await applyHash();
   else renderHome();
 })();
+
+// ================================================================
+// 固定ページ（はじめての方へ・お問い合わせ・プライバシーポリシー）
+// ================================================================
+// 記事と違い、書いたあとも記事リンクを足していく場所です。
+// そのため、リンクを選んで差し込めるようにしてあります。
+
+let PAGE = null;          // いま開いているページ
+let PG_TIMER = null;      // 入力が止まってからプレビューを作り直すための待ち時間
+
+async function renderPages() {
+  let r;
+  try { r = await api('pages'); } catch (e) { return; }
+  const list = r.pages || [];
+  $('#pageCount').textContent = `${list.length}件`;
+
+  $('#pageList').innerHTML = list.length ? `<table class="tbl">
+    <thead><tr><th>ページ</th><th>記事リンク</th><th>文字数</th><th>更新</th><th class="r"></th></tr></thead><tbody>
+    ${list.map((p) => `<tr>
+      <td class="t">${esc(p.title)}
+        <div class="note" style="margin:2px 0 0">/${esc(p.slug)}/${p.protectedPage ? '　（URLは変えられません）' : ''}</div></td>
+      <td>${p.links ? `<span class="tag ok">${p.links}本</span>` : '<span class="tag">なし</span>'}</td>
+      <td class="note">${p.chars}字</td>
+      <td class="note">${esc(p.updated)}</td>
+      <td class="r"><button class="primary" data-page="${esc(p.slug)}">編集</button></td>
+    </tr>`).join('')}</tbody></table>`
+    : '<p class="note">ページがありません。</p>';
+
+  $('#pageList').querySelectorAll('[data-page]').forEach((b) =>
+    b.addEventListener('click', () => openPage(b.dataset.page)));
+}
+
+async function openPage(slug) {
+  const r = await api('page/get?slug=' + encodeURIComponent(slug));
+  if (!r.page) return;
+  PAGE = r.page;
+
+  $('#pgTitle').textContent = PAGE.title || PAGE.slug;
+  $('#pgMeta').textContent = `/${PAGE.slug}/`;
+  $('#pgBody').value = PAGE.body;
+  $('#pgMetaTitle').value = PAGE.title;
+  $('#pgMetaDesc').value = PAGE.description;
+  $('#pgSaved').textContent = '';
+
+  await fillPageLinkPicker();
+  show('page-edit');
+  renderPagePreview();
+}
+
+// 差し込める記事の一覧。すでに本文にあるものは、印を付けて分かるようにします。
+async function fillPageLinkPicker() {
+  let r;
+  try { r = await api('link-targets'); } catch (e) { return; }
+  const body = $('#pgBody').value;
+  const list = (r.targets || []).filter((t) => t.slug !== (PAGE && PAGE.slug));
+  $('#pgLinkPick').innerHTML = list.map((t) => {
+    const already = body.includes(`{{link:${t.slug}`);
+    return `<option value="${esc(t.slug)}">${already ? '● ' : ''}［${esc(t.kind)}］${esc(t.title)}</option>`;
+  }).join('');
+  updatePageLinkLabel();
+}
+
+// 選んだ記事に合わせて、リンクの文字の候補を入れておきます
+function updatePageLinkLabel() {
+  const opt = $('#pgLinkPick').selectedOptions[0];
+  if (!opt) return;
+  // 「うさぎのケージのおすすめ7選｜…」→「ケージのおすすめ記事」
+  const t = opt.textContent.replace(/^●\s*/, '').replace(/^［[^］]*］/, '');
+  const m = t.match(/^うさぎの(.+?)のおすすめ/);
+  $('#pgLinkLabel').value = m ? `${m[1]}のおすすめ記事` : t.split('｜')[0];
+}
+$('#pgLinkPick').addEventListener('change', updatePageLinkLabel);
+
+$('#btnPgLink').addEventListener('click', () => {
+  const slug = $('#pgLinkPick').value;
+  if (!slug) return toast('記事を選んでください');
+  const label = $('#pgLinkLabel').value.trim() || slug;
+  const ta = $('#pgBody');
+  const at = ta.selectionStart;
+  const snippet = `{{link:${slug}|${label}}}`;
+  ta.value = ta.value.slice(0, at) + snippet + ta.value.slice(ta.selectionEnd);
+  ta.focus();
+  ta.setSelectionRange(at + snippet.length, at + snippet.length);
+  schedulePagePreview();
+  fillPageLinkPicker();
+  toast('リンクを入れました');
+});
+
+$('#pgBody').addEventListener('input', schedulePagePreview);
+
+function schedulePagePreview() {
+  clearTimeout(PG_TIMER);
+  PG_TIMER = setTimeout(renderPagePreview, 700);
+}
+
+async function renderPagePreview() {
+  if (!PAGE) return;
+  let r;
+  try { r = await api('page/preview', { slug: PAGE.slug, body: $('#pgBody').value }); } catch (e) { return; }
+  const f = $('#pgPreview');
+  const keep = f.contentWindow ? f.contentWindow.scrollY : 0;
+  f.srcdoc = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
+    <link rel="stylesheet" href="/preview.css">
+    <style>body{margin:0;background:#fff}
+      .wrap{max-width:760px;margin:0 auto;padding:24px 20px 60px}</style>
+    </head><body><div class="wrap"><article class="entry-content">${r.html}</article></div>
+    <script>window.addEventListener('load',()=>window.scrollTo(0,${keep}))<\/script>
+    </body></html>`;
+}
+
+$('#btnPgSave').addEventListener('click', async () => {
+  if (!PAGE) return;
+  $('#pgSaved').innerHTML = '<span class="spin"></span>保存しています…';
+  const r = await api('page/save', {
+    slug: PAGE.slug, body: $('#pgBody').value,
+    title: $('#pgMetaTitle').value.trim(), description: $('#pgMetaDesc').value.trim(),
+  });
+  if (r.error) { $('#pgSaved').textContent = ''; return; }
+  await api('site/build', { drafts: false });
+  PAGE.title = $('#pgMetaTitle').value.trim();
+  $('#pgTitle').textContent = PAGE.title || PAGE.slug;
+  $('#pgSaved').textContent = `保存しました（${r.page.chars}字）。サイトに出すには「公開」から反映してください。`;
+  toast('保存しました');
+});
+
+$('#btnPgPreviewOpen').addEventListener('click', () => {
+  if (!PAGE) return;
+  window.open(STATE.site.previewUrl + PAGE.slug + '/', '_blank');
+});
+
+$('#btnBackPages').addEventListener('click', () => show('pages'));

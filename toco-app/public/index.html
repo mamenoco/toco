@@ -16,6 +16,7 @@
   <button class="nav" data-view="articles"><span class="ic">▤</span>記事<span class="tail" id="navArticles" hidden></span></button>
   <button class="nav" data-view="products"><span class="ic">▢</span>商品<span class="tail" id="navProducts" hidden></span></button>
   <button class="nav" data-view="inventory"><span class="ic">☖</span>持ちもの台帳</button>
+  <button class="nav" data-view="pages"><span class="ic">▥</span>ページ</button>
   <div class="sep"></div>
   <button class="nav" data-view="publish"><span class="ic">↥</span>公開<span class="tail" id="navPublish" hidden></span></button>
   <button class="nav" data-view="video"><span class="ic">▶</span>動画</button>
@@ -68,6 +69,63 @@
     </div>
   </div>
   <div id="ideaList"></div>
+</section>
+
+<!-- ============ 固定ページ ============ -->
+<section id="view-pages" class="view">
+  <div class="vh"><h1>ページ</h1><span class="sub" id="pageCount"></span></div>
+  <div class="card">
+    <p class="note">記事の一覧やカテゴリには出ない、独立したページです。
+      「はじめての方へ」は、記事が増えるたびにリンクを足していく場所になります。</p>
+    <div id="pageList"></div>
+  </div>
+</section>
+
+<!-- ============ ページの編集 ============ -->
+<section id="view-page-edit" class="view">
+  <div class="vh">
+    <button class="ghost" id="btnBackPages">‹ 一覧へ</button>
+    <h1 id="pgTitle">　</h1>
+    <span class="sub" id="pgMeta"></span>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>本文</h3>
+      <p class="note">書き換えたら「保存してサイトに反映」を押してください。右側に仕上がりが出ます。</p>
+
+      <div class="card" style="background:var(--tint,#fff6f3);margin:0 0 12px">
+        <h3 style="margin:0 0 6px;font-size:13px">記事へのリンクを入れる</h3>
+        <p class="note" style="margin:0 0 8px">選んで「入れる」を押すと、カーソルの位置に差し込まれます。
+          本文中のリンクと、関連記事カードの両方が出ます。</p>
+        <div class="inline">
+          <label style="flex:1">記事<select id="pgLinkPick"></select></label>
+          <label>リンクの文字<input id="pgLinkLabel" placeholder="ケージのおすすめ記事"></label>
+          <button class="primary" id="btnPgLink">入れる</button>
+        </div>
+      </div>
+
+      <textarea id="pgBody" rows="26" spellcheck="false"></textarea>
+
+      <details style="margin-top:10px">
+        <summary class="note">タイトルと説明文（検索結果に出ます）</summary>
+        <label>タイトル<input id="pgMetaTitle"></label>
+        <label>説明文<textarea id="pgMetaDesc" rows="2"></textarea></label>
+      </details>
+
+      <div class="row" style="margin-top:12px">
+        <button class="primary big" id="btnPgSave">保存してサイトに反映</button>
+        <button class="ghost" id="btnPgPreviewOpen">別のタブで開く</button>
+        <span class="note" id="pgSaved"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>仕上がり</h3>
+      <p class="note">公開されるページと同じ見た目です。本文を書き換えると少しあとに追いつきます。</p>
+      <iframe id="pgPreview" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+    </div>
+  </div>
 </section>
 
 <!-- ============ 記事一覧 ============ -->
