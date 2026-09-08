@@ -1,10 +1,13 @@
 ---
-title: うさぎの給水ボトル・給水器のおすすめ
+title: うさぎの給水ボトルのおすすめ5選｜皿タイプとの違いや選び方まで詳しく紹介
 slug: rabbit-bottle
 category: food
+tags: [給水ボトル, 選び方, 皿タイプ, 飲水量]
 date: 2026-09-08
 updated: 2026-09-08
-status: draft
+description: うさぎの給水ボトルを、飲んだ量が分かるか・ノズル型か皿型か・容量と取り付け方・洗いやすさの4点から比べました。ノズルから飲まない子への切り替えや、水漏れ対策のポイントもまとめています。
+eyecatch: /assets/eyecatch/rabbit-bottle.jpg
+status: publish
 ---
 # うさぎの給水ボトルのおすすめ5選｜皿タイプとの違いや選び方まで詳しく紹介
 
