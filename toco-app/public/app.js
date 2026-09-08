@@ -150,12 +150,28 @@ async function renderPending() {
   $('#pendList').innerHTML = list.length ? '<table class="tbl"><tbody>'
     + list.map((x, i) => `<tr>
       <td class="t">${esc(x.labels.join(' / '))}
-        <div class="note" style="margin:2px 0 0">/${esc(x.slug)}/　${esc(x.usedIn.map((u) => u.title).join('、').slice(0, 40))} で使用</div></td>
+        <div class="note" style="margin:2px 0 0">/${esc(x.slug)}/　${esc(x.usedIn.map((u) => u.title).join('、').slice(0, 40))} で使用</div>
+        ${(x.similar || []).length ? `<div class="note" style="margin:4px 0 0;color:var(--err)">
+          この記事は<b>もう書いてあります</b>。本文のURLが違うため、リンクになっていません。<br>
+          ${x.similar.map((sm) => `<button class="ghost" data-fixlink="${i}" data-to="${esc(sm.slug)}"
+            style="margin:4px 4px 0 0;padding:3px 9px;font-size:11px">/${esc(sm.slug)}/ につなぐ</button>`).join('')}
+          </div>` : ''}</td>
       <td class="r">${x.status === 'published' ? '<span class="tag ok">リンク済み</span>'
         : x.status === 'draft' ? '<span class="tag warn">下書きあり</span>'
         : `<button class="ghost" data-idea="${i}">記事ネタに追加</button>`}</td>
     </tr>`).join('') + '</tbody></table>'
     : '<p class="note">いまはありません。</p>';
+
+  $('#pendList').querySelectorAll('[data-fixlink]').forEach((b) => b.addEventListener('click', async () => {
+    const x = list[Number(b.dataset.fixlink)];
+    const to = b.dataset.to;
+    if (!confirm(`本文の {{link:${x.slug}|…}} を、すべて /${to}/ につなぎ変えます。よろしいですか？`)) return;
+    const r = await api('links/retarget', { from: x.slug, to });
+    if (r.error) return;
+    await api('site/build', { drafts: false });
+    renderPending();
+    toast(`${r.changed.length}か所つなぎ直しました`);
+  }));
 
   $('#pendList').querySelectorAll('[data-idea]').forEach((b) => b.addEventListener('click', async () => {
     const x = list[Number(b.dataset.idea)];

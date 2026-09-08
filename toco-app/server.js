@@ -531,6 +531,37 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { links: links.scan() });
     }
 
+    // 本文のスラッグを、実際にある記事のスラッグに書き換える。
+    // 「あとで書く」と書いておいたリンクを、別の名前で書いてしまったときの直しです。
+    if (p === '/api/links/retarget') {
+      const from = String(body.from || '').trim();
+      const to = String(body.to || '').trim();
+      if (!from || !to) return send(res, 200, { error: '書き換え元と書き換え先が必要です' });
+      if (!articles.isValidSlug(to)) return send(res, 200, { error: 'URLの形が正しくありません' });
+      if (!articles.read(to)) return send(res, 200, { error: `${to} の記事が見つかりません` });
+
+      const re = new RegExp('\\{\\{link:' + from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\|)', 'g');
+      const changed = [];
+
+      // 記事と固定ページの両方を見ます
+      articles.list().forEach((a) => {
+        const cur = articles.read(a.slug);
+        if (!cur || !re.test(cur.body)) return;
+        re.lastIndex = 0;
+        articles.save(a.slug, cur.meta, cur.body.replace(re, () => `{{link:${to}|`));
+        changed.push({ kind: '記事', slug: a.slug, title: a.title });
+      });
+      pages.list().forEach((pg) => {
+        const cur = pages.read(pg.slug);
+        if (!cur || !re.test(cur.body)) return;
+        re.lastIndex = 0;
+        pages.save(pg.slug, cur.meta, cur.body.replace(re, () => `{{link:${to}|`));
+        changed.push({ kind: 'ページ', slug: pg.slug, title: pg.title });
+      });
+
+      return send(res, 200, { ok: true, changed });
+    }
+
     // リンク待ちを記事ネタに登録する
     if (p === '/api/links/to-idea') {
       db.ideas = db.ideas || DB.seedIdeas();
