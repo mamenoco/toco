@@ -278,13 +278,13 @@ function buildAssets() {
       ].join(''),
       // ピックアップのカテゴリ札。掲載順ではなくカテゴリごとに色を決める
       [
-        '.pickup-card .pickup-image span{color:#fff;background:rgba(228,142,154,.9)}',
-        '.pickup-card .pickup-image span.cat-food{background:rgba(228,142,154,.9)}',
-        '.pickup-card .pickup-image span.cat-house{background:rgba(197,159,102,.92)}',
-        '.pickup-card .pickup-image span.cat-toy{background:rgba(143,166,103,.9)}',
-        '.pickup-card .pickup-image span.cat-care{background:rgba(166,142,173,.9)}',
-        '.pickup-card .pickup-image span.cat-life{background:rgba(206,150,124,.92)}',
-        '.pickup-card .pickup-image span.cat-column{background:rgba(150,166,158,.92)}',
+        '.pickup-card .pickup-image span{color:#fff;background:rgba(232,138,155,.92)}',
+        '.pickup-card .pickup-image span.cat-food{color:#fff;background:rgba(232,138,155,.92)}',
+        '.pickup-card .pickup-image span.cat-house{color:#8a6835;background:rgba(246,219,158,.95)}',
+        '.pickup-card .pickup-image span.cat-toy{color:#fff;background:rgba(166,201,121,.94)}',
+        '.pickup-card .pickup-image span.cat-care{color:#fff;background:rgba(190,152,211,.93)}',
+        '.pickup-card .pickup-image span.cat-life{color:#8a5a42;background:rgba(251,199,175,.96)}',
+        '.pickup-card .pickup-image span.cat-column{color:#fff;background:rgba(136,196,196,.94)}',
       ].join(''),
       // コラム一覧の矢印。文字の「›」は円の中で右下にずれるので、線で描き直す
       [
