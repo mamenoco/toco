@@ -28,7 +28,26 @@ const { buildBrief } = require('./lib/brief.js');
 const claude = require('./lib/claude.js');
 const { runChecks } = require('./lib/checks.js');
 const markdown = require('./lib/markdown.js');
-const builder = require('./lib/build.js');
+// ビルドまわりは、呼ぶたびに読み込み直します。
+// Node は一度 require したファイルを覚えたままなので、そのままだと
+// lib/ を書き換えてもアプリを再起動するまで古いプログラムでビルドされます。
+// （HTMLだけ新しくCSSが古い、といった食い違いが起きるため）
+function loadBuilder() {
+  const LIB = path.join(__dirname, 'lib') + path.sep;
+  const seen = new Set();
+  (function forget(id) {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const mod = require.cache[id];
+    if (!mod) return;
+    // build.js が読み込んでいる lib/ の中のファイルも、まとめて忘れさせます
+    mod.children.forEach((child) => {
+      if (child.filename.startsWith(LIB)) forget(child.id);
+    });
+    delete require.cache[id];
+  })(require.resolve('./lib/build.js'));
+  return require('./lib/build.js');
+}
 const deploy = require('./lib/deploy.js');
 const siteConfig = require('./lib/site-config.js');
 const affiliate = require('./lib/affiliate.js');
@@ -823,7 +842,7 @@ const server = http.createServer(async (req, res) => {
       const md = body.article != null ? body.article : bodyOf(pr);
       // 目次は本文の最初の見出しの直前に入るので、プレビューでも同じ位置にします
       // プレビューでは、どのHTMLが本文の何行目かを埋め込みます（その場で直せるようにするため）
-      const r = builder.renderArticle(md, { trackSource: true });
+      const r = loadBuilder().renderArticle(md, { trackSource: true });
       let html = r.html;
       if (r.toc) {
         const at = html.indexOf('<h2');
@@ -1101,7 +1120,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/site/build') {
       // drafts:true のときだけ下書きも書き出します（手元のプレビュー専用）。
       // 「サイトに反映する」は必ず下書きを除いて作り直すので、公開されることはありません。
-      const r = builder.build({
+      const r = loadBuilder().build({
         year: new Date().getFullYear(), assetVer: String(Date.now()).slice(-6),
         includeDrafts: !!body.drafts,
       });
@@ -1116,7 +1135,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/site/publish') {
       const log = [];
-      const r = builder.build({ year: new Date().getFullYear(), assetVer: String(Date.now()).slice(-6) });
+      const r = loadBuilder().build({ year: new Date().getFullYear(), assetVer: String(Date.now()).slice(-6) });
       LAST.build = new Date().toISOString();
       log.push(`サイトを書き出しました（記事${r.articles}本・${r.ms}ms）`);
 
