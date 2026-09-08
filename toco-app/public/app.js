@@ -1428,7 +1428,7 @@ async function runCheck() {
       <p>${esc(c.detail)}</p>
       ${(c.fix || c.goto) ? `<div class="row" style="margin:7px 0 0">
         ${c.fix ? `<button class="ghost" data-fix="${i}">これを直してもらう</button>` : ''}
-        ${c.goto ? `<button class="primary" data-goto="${i}">${c.goto.view === 'inventory' ? '持ちもの台帳を開く' : '書く場所へ移動'}</button>` : ''}
+        ${c.goto ? `<button class="primary" data-goto="${i}">${c.goto.view === 'inventory' ? '持ちもの台帳を開く' : c.goto.view === 'meta' ? '公開の設定を開く' : '書く場所へ移動'}</button>` : ''}
       </div>` : ''}
       ${!c.fix && c.goto && c.goto.step ? '<p class="note" style="margin-top:5px">※ここはご自身で書き足してください。AIには書かせません。</p>' : ''}
     </div>`).join('');
@@ -1470,6 +1470,8 @@ function textTop(ta, idx) {
 function jumpTo(g) {
   if (!g) return;
   if (g.view === 'inventory') { show('inventory'); toast('使っている用品を登録してください'); return; }
+  // 説明文やアイキャッチは本文ではなく「公開の設定」で直します
+  if (g.view === 'meta') { gotoStep(4); return; }
   gotoStep(2);
   const ta = $('#articleText');
   if (!g.find) { ta.focus(); return; }

@@ -1,10 +1,11 @@
 ---
-title: うさぎのトイレのおすすめ5選｜掃除しやすい・使いやすい形の選び方
+title: うさぎのトイレのおすすめ5選｜掃除しやすい形の選び方や固定のしかたまで詳しく紹介
 slug: rabbit-toilet
 category: toy
 tags: [トイレ, 初心者]
 date: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-08
+description: 四角と三角の違いや、ケージへの固定のしかた、スノコの素材と網目の細かさまで、うさぎのトイレ選びで見ておきたいポイントをまとめました。掃除の手間や体の大きさに合わせた選び方もあわせて紹介します。
 eyecatch: /assets/eyecatch/rabbit-toilet.jpg
 status: publish
 ---

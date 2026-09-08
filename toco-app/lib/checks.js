@@ -123,7 +123,7 @@ function nameAppears(name, flatText) {
   return hit / g.size >= 0.8;
 }
 
-function runChecks(article, project, inventory) {
+function runChecks(article, project, inventory, meta) {
   const out = [];
   const text = article || '';
   const add = (level, label, detail, fix, goto) =>
@@ -132,6 +132,50 @@ function runChecks(article, project, inventory) {
   if (!text.trim()) {
     add('error', '記事が空です', 'Claude Codeで書いた記事を貼り付けてください。');
     return out;
+  }
+
+  // 公開したときに読者へ出てしまうもの・検索結果に響くもの
+  // 本文だけでは分からないので、フロントマター（meta）も見ます。
+  {
+    // 体験を書く場所が空欄のまま。公開ページにそのまま出ます。
+    //
+    // <!-- --> の中は読者に出ないので外します（公開前チェックのメモ書きなど）。
+    // また【】は「【まとめ】」のような普通の使い方もあるため、
+    // 書きかけと分かる印（全角スペース・〜・◯・ここに）が入っているものだけを拾います。
+    const visible = text.replace(/<!--[\s\S]*?-->/g, '');
+    const holes = (visible.match(/【[^】]*】/g) || [])
+      .filter((h) => /[　〜～◯○]|ここに|書く/.test(h));
+    holes.forEach((h) => {
+      add('error', '体験の欄が空のままです', `${h} が本文に残っています。`
+        + '公開すると、このまま読者に見えてしまいます。ご自身の体験を書くか、行ごと削除してください。',
+        '', { step: 2, find: h });
+    });
+
+    if (meta) {
+      // 説明文は検索結果に出ます。空だと本文の断片が拾われます。
+      const desc = String(meta.description || '').trim();
+      if (!desc) {
+        add('error', '説明文がありません',
+          '検索結果に出る文章です。空のままだと本文の一部が勝手に使われます。'
+          + '「公開の設定」で入れてください（本文から自動で作れます）。',
+          '', { view: 'meta' });
+      } else if (desc.length < 40) {
+        add('warn', `説明文が短いです（${desc.length}字）`,
+          '80〜120字を目安にすると、検索結果で内容が伝わります。', '', { view: 'meta' });
+      }
+
+      if (!String(meta.eyecatch || '').trim()) {
+        add('warn', 'アイキャッチがありません',
+          '記事一覧とSNSで使われる画像です。「公開の設定」で設定してください。',
+          '', { view: 'meta' });
+      }
+
+      if (!String(meta.title || '').trim()) {
+        add('error', 'タイトルがありません',
+          '「公開の設定」でタイトルを入れてください。本文の見出しから自動で入れられます。',
+          '', { view: 'meta' });
+      }
+    }
   }
 
   // 禁止表現

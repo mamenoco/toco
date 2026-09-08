@@ -953,7 +953,8 @@ const server = http.createServer(async (req, res) => {
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
       const text = body.article != null ? body.article : bodyOf(pr);
       if (body.article != null) writeArticle(pr, body.article);
-      return send(res, 200, { results: runChecks(text, pr, db.inventory) });
+      // フロントマターも渡します。説明文やアイキャッチの抜けは本文からは分からないためです。
+      return send(res, 200, { results: runChecks(text, pr, db.inventory, metaOf(pr)) });
     }
 
     // ===== コピペチェック =====
