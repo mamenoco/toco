@@ -115,11 +115,20 @@
       q = (new URLSearchParams(location.search).get('q') || '').trim();
     } catch (e) { q = ''; }
     if (input) input.value = q;
+    var headerInput = document.getElementById('header-search-input');
+    if (headerInput) headerInput.value = q;
     document.title = (q ? '「' + q + '」の検索結果' : '検索') + '｜tocoとくらし';
 
+    var heading = document.getElementById('search-heading');
+    var noteText = document.getElementById('search-note-text');
+
     if (!q) {
+      // まだ何も検索していない状態。「結果」ではないので見出しも変えます
+      if (heading) heading.textContent = '検索';
       summary.textContent = 'キーワードを入れて検索してください。';
+      if (noteText) noteText.textContent = 'カテゴリから見てみることもできます。';
       if (note) note.hidden = false;
+      if (input) input.focus();
       return;
     }
 

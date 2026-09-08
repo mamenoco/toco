@@ -281,6 +281,24 @@ function buildAssets() {
         '.category-section{padding-top:52px}',
         '@media(max-width:600px){.category-section{padding-top:46px}}',
       ].join(''),
+      // ヘッダーの検索窓。
+      // 旧テーマではボタンを押すと別の入力欄（検索ドロワー）が開く作りでしたが、
+      // 入力欄が2つ見えて分かりにくいので、この窓に直接入力する形にしました。
+      [
+        '.search-pill{cursor:auto}',
+        '.search-pill input{flex:1;min-width:0;height:100%;padding:0;border:0;outline:0;',
+        'background:transparent;color:var(--ink);font-family:inherit;font-size:12px;cursor:text}',
+        '.search-pill input::placeholder{color:#a1948f;opacity:1}',
+        '.search-pill input::-webkit-search-cancel-button{cursor:pointer}',
+        '.search-pill button{width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;',
+        'padding:0;border:0;border-radius:50%;color:#fff;background:var(--pink);cursor:pointer;',
+        'transition:filter .15s ease}',
+        '.search-pill button:hover{filter:brightness(1.05)}',
+        '.search-pill:focus-within{border-color:var(--pink)}',
+        // 900px以下では窓が丸ボタンだけに縮むので、押したら検索ページへ送ります
+        '@media(max-width:900px){.search-pill input{display:none}}',
+        '@media(max-width:600px){.search-pill button{width:36px;height:36px}}',
+      ].join(''),
       // 検索結果ページ
       [
         '.archive-header .search-page-form{display:flex;max-width:520px;height:44px;margin:18px 0 0}',
