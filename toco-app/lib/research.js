@@ -71,11 +71,14 @@ async function rakutenSearch(appId, accessKey, keyword, hits, page, opts) {
     throw new Error(`楽天API: ${msg}`);
   }
   if (res.status === 403 || /CLIENT_IP_NOT_ALLOWED/.test(JSON.stringify(json))) {
+    // その場で貼り付けられるように、いまのIPをここで調べて文面に入れます。
+    // 設定画面まで見に行かなくて済むようにするためです。
+    const now = await currentIp();
     throw new Error(
-      '楽天APIに接続できませんでした（接続元のIPアドレスが許可されていません）。\n'
-      + '楽天ウェブサービスの管理画面で、いまのIPアドレスを「Allowed IP addresses」に追加してください。\n'
-      + 'IPアドレスは、設定画面の「接続元のIPアドレス」で調べられます。\n'
-      + '回線のIPが変わるたびに同じことが起きるため、許可リストを空にしておく運用も選べます。');
+      '楽天APIに接続できませんでした（接続元のIPアドレスが許可されていません）。\n\n'
+      + (now ? `いまのIPアドレス： ${now}\n\n` : '')
+      + '楽天ウェブサービスの管理画面（https://webservice.rakuten.co.jp/app/list）を開いて、'
+      + 'このIPを「Allowed IP addresses」に追加してください。');
   }
   if (!res.ok) throw new Error(`楽天API: HTTP ${res.status}`);
   return (json.Items || []).map((w) => {
@@ -119,5 +122,13 @@ async function fetchReviewText(itemUrl) {
   return { reviewUrl, text: text.replace(/\n{3,}/g, '\n\n').trim().slice(0, 20000) };
 }
 
+
+// いまの接続元IP（IPv4）。楽天APIはIPv6を持たないので、見られているのは常にIPv4です。
+async function currentIp() {
+  try {
+    const r = await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(8000) });
+    return (await r.text()).trim();
+  } catch (e) { return ''; }
+}
 
 module.exports = { politeFetch, htmlToText, rakutenSearch, fetchReviewText };
