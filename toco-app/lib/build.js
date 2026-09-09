@@ -156,7 +156,9 @@ function replaceLegacyProductLines(md) {
 function menuHtml(currentPath) {
   return '<ul class="menu">'
     + config.menu.map(([label, href]) => {
-      const here = !!currentPath && href === currentPath;
+      // ページ送り（/category/column/page/2/）も同じ項目の現在地として扱います
+      const here = !!currentPath && (href === currentPath
+        || (href !== '/' && href.endsWith('/') && currentPath.startsWith(href)));
       return `<li${here ? ' class="current-menu-item"' : ''}>`
         + `<a href="${esc(href)}"${here ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`;
     }).join('')
