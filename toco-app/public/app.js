@@ -887,7 +887,12 @@ async function aiRun(mode) {
   if (AI_JOB) return toast('いま実行中です');
   const instruction = $('#aiInstruction').value.trim();
   if (mode === 'revise' && !instruction) return toast('どこをどう直すか書いてください');
-  if (mode === 'write' && (CURRENT.products || []).length === 0) return toast('先に商品を選んでください');
+  // 商品の持ち方が種類で違います。
+  //   商品紹介 … 楽天から選んだ商品（CURRENT.products）
+  //   コラム   … すでに公開ずみの記事で紹介している商品（CURRENT.columnProducts）
+  // コラムは商品に触れないこともあるので、選んでいなくても書きはじめられます。
+  if (mode === 'write' && currentKind() !== 'column'
+    && (CURRENT.products || []).length === 0) return toast('先に商品を選んでください');
   if (mode === 'write' && $('#articleText').value.trim()
     && !confirm('いまの本文は残したまま、新しい案を下に表示します。よろしいですか？')) return;
 

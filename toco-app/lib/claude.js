@@ -62,8 +62,17 @@ function buildPrompt(mode, project, instruction, brief, body) {
   fs.writeFileSync(w.article, mode === 'write' ? PLACEHOLDER + '\n' : (body || ''), 'utf8');
   if (mode === 'write') fs.writeFileSync(w.brief, brief, 'utf8');
 
+  // 商品紹介とコラムでは型がまったく違うので、どちらを書くのかを先に伝えます。
+  // ここを書かないと、コラムでも比較表やスペック表を作ってしまいます。
+  const column = require('./kind.js').isColumn(project);
+
   const head = [
     'あなたはうさぎ専門メディア「tocoとくらし」の記事を担当します。',
+    column
+      ? 'この記事は【コラム】です。スタイルガイドの「2-2. コラム記事の型」に従ってください。'
+        + '比較表とスペック表は作らず、商品の紹介は2〜3文にとどめて、'
+        + '詳しい話はその商品を紹介している記事へのリンクで送ってください。'
+      : 'この記事は【商品紹介】です。スタイルガイドの「2. 記事テンプレート（商品紹介・比較記事）」に従ってください。',
     '次のスタイルガイドに必ず従ってください。',
     '',
     '===== スタイルガイド（CLAUDE.md） =====',
