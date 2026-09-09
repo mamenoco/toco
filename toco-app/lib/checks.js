@@ -125,6 +125,9 @@ function nameAppears(name, flatText) {
 
 function runChecks(article, project, inventory, meta) {
   const out = [];
+  // コラムは商品を並べる記事ではないので、比較表・スペック表・商品数の
+  // 突き合わせは見ません。代わりに「送り先の記事へ送れているか」を見ます。
+  const isColumn = require('./kind.js').isColumn(project);
   const text = article || '';
   const add = (level, label, detail, fix, goto) =>
     out.push({ level, label, detail, fix: fix || '', goto: goto || null });
@@ -474,22 +477,27 @@ function runChecks(article, project, inventory, meta) {
   }
 
   // 内部リンク
-  if (!/関連記事|あわせてチェック|\]\(\//.test(text)) {
+  // {{link:…}} と {{card:…}} も内部リンクです。ここを見落とすと、
+  // きちんとリンクを置いた記事にまで「見当たりません」と出てしまいます。
+  if (!/\{\{link:|\{\{card:|関連記事|あわせてチェック|\]\(\//.test(text)) {
     add('warn', '内部リンクが見当たりません', '関連記事へのリンクを1本以上置いてください。');
   }
 
   // 構成
   const h2 = (text.match(/^##\s+/gm) || []).length;
-  if (h2 < 4) add('warn', `見出し（h2）が${h2}個しかありません`, 'テンプレートでは6〜8個が目安です。');
+  if (h2 < (isColumn ? 3 : 4)) {
+    add('warn', `見出し（h2）が${h2}個しかありません`,
+      isColumn ? '読み物として、3個以上を目安にしてください。' : 'テンプレートでは6〜8個が目安です。');
+  }
 
   // まとめの締め
   if (!/ぜひこの記事を参考にして/.test(text)) {
-    add('info', 'まとめの定型文が見当たりません',
+    if (!isColumn) add('info', 'まとめの定型文が見当たりません',
       '「ぜひこの記事を参考にして、〜見つけてみてください。」で締める形に揃えています。');
   }
 
-  // 商品数と、登録した商品／本文に書かれた商品の突き合わせ
-  if (project && project.products) {
+  // 商品数と、登録した商品／本文に書かれた商品の突き合わせ（商品紹介の記事だけ）
+  if (!isColumn && project && project.products) {
     const products = project.products;
     const n = products.length;
     if (n && (n < 5 || n > 7)) add('info', `登録した商品が${n}点です`, '5〜7点に収めるルールです。');
@@ -535,6 +543,43 @@ function runChecks(article, project, inventory, meta) {
     if (missing.length) {
       add('warn', `登録した商品${missing.length}点が本文に見当たりません`,
         missing.map((x) => x.name).join(' / '));
+    }
+  }
+
+  // コラムの決まりごと
+  if (isColumn) {
+    const ids = [...String(text).matchAll(/\{\{product:([A-Za-z0-9_-]+)\}\}/g)].map((m) => m[1]);
+    const uniq = [...new Set(ids)];
+
+    if (uniq.length > 4) {
+      add('warn', `商品が${uniq.length}点あります`,
+        'コラムは読み物です。商品は2〜4点までにして、詳しい比較は商品紹介の記事へ送ってください。'
+        + '数が多いと、その商品紹介の記事と同じ検索語で競ってしまいます。');
+    }
+
+    // 商品に触れたら、必ず送り先を置く決まり
+    if (uniq.length && !/\{\{link:/.test(text)) {
+      add('error', '送り先の記事へのリンクがありません',
+        '商品に触れたときは、その商品を詳しく紹介している記事へのリンクを必ず置いてください。'
+        + '（{{link:スラッグ|記事名}} の形）');
+    }
+
+    // 商品ごとの紹介が長すぎないか。見出しから次の見出しまでの字数で見ます。
+    const secs = String(text).split(/^###\s+/m).slice(1);
+    const longOnes = secs.filter((sec) => {
+      if (!/\{\{product:/.test(sec)) return false;
+      const body = sec.split('\n').slice(1).join('\n')
+        .replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, '');
+      return body.length > 260;
+    }).length;
+    if (longOnes) {
+      add('warn', `商品の紹介が長い箇所が${longOnes}か所あります`,
+        'コラムでの紹介は2〜3文までにして、続きは商品紹介の記事へ送ってください。');
+    }
+
+    if (/\|\s*-{2,}/.test(text) && /おすすめ.*選/.test(text)) {
+      add('warn', '比較表があります',
+        'コラムでは比較表を作りません。商品紹介の記事の役目です。');
     }
   }
 

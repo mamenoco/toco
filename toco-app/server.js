@@ -24,7 +24,7 @@ const { execSync } = require('child_process');
 const DB = require('./lib/db.js');
 const articles = require('./lib/articles.js');
 const research = require('./lib/research.js');
-const { buildBrief } = require('./lib/brief.js');
+const { buildBrief, buildColumnBrief } = require('./lib/brief.js');
 const claude = require('./lib/claude.js');
 const { runChecks } = require('./lib/checks.js');
 const markdown = require('./lib/markdown.js');
@@ -56,6 +56,7 @@ const curate = require('./lib/curate.js');
 const links = require('./lib/links.js');
 const pages = require('./lib/pages.js');
 const ideaAI = require('./lib/idea-ai.js');
+const kind = require('./lib/kind.js');
 const similarity = require('./lib/similarity.js');
 const imageAI = require('./lib/image-ai.js');
 const translate = require('./lib/translate.js');
@@ -133,6 +134,7 @@ function projectSummary(x) {
   return {
     id: x.id, title: x.title, keyword: x.keyword, category: x.category,
     slug: x.slug || '', status: x.status, createdAt: x.createdAt,
+    kind: kind.of(x),
     productCount: (x.products || []).length,
     hasArticle: !!(a && a.body.trim()),
     chars: a ? a.body.length : 0,
@@ -506,6 +508,7 @@ const server = http.createServer(async (req, res) => {
       if (!idea) return send(res, 200, { error: '記事ネタが見つかりません' });
       const pr = newProject(db, {
         title: idea.title, keyword: idea.keyword, category: idea.category,
+        kind: kind.of(idea),
         slug: idea.slug || '',
         ideaId: idea.id, ideaNote: idea.note || '',
       });
@@ -527,7 +530,9 @@ const server = http.createServer(async (req, res) => {
       const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
       if (!pr) return send(res, 200, { project: null });
       return send(res, 200, {
-        project: Object.assign({}, pr, { article: bodyOf(pr), meta: metaOf(pr) }),
+        project: Object.assign({}, pr, {
+          article: bodyOf(pr), meta: metaOf(pr), kind: kind.of(pr),
+        }),
         inventory: db.inventory,
         categories: siteConfig.categories,
       });
@@ -536,6 +541,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/project/update') {
       const i = db.projects.findIndex((x) => x.id === body.id);
       if (i < 0) return send(res, 200, { error: '記事が見つかりません' });
+      // 記事の種類と、コラムで触れる商品
+      if (body.kind === 'column' || body.kind === 'product') db.projects[i].kind = body.kind;
+      if (Array.isArray(body.columnProducts)) db.projects[i].columnProducts = body.columnProducts;
       const patch = Object.assign({}, body);
       delete patch.article;
       db.projects[i] = Object.assign(db.projects[i], patch);
@@ -788,8 +796,15 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/brief') {
       const pr = db.projects.find((x) => x.id === body.id);
       if (!pr) return send(res, 200, { error: '記事が見つかりません' });
-      registerPicked(pr);          // 先にIDを確定させてからブリーフに書く
-      const md = buildBrief(pr, db.inventory);
+      let md;
+      if (kind.isColumn(pr)) {
+        // コラムは、すでに公開ずみの記事で紹介している商品から選びます。
+        // 楽天の検索も口コミの取得も通らないので、登録の処理は要りません。
+        md = buildColumnBrief(pr, columnMentions(pr));
+      } else {
+        registerPicked(pr);        // 先にIDを確定させてからブリーフに書く
+        md = buildBrief(pr, db.inventory);
+      }
       const dir = path.join(ROOT, '..', 'articles', 'briefs');
       fs.mkdirSync(dir, { recursive: true });
       const file = path.join(dir, `${(pr.keyword || 'brief').replace(/[\/\\:*?"<>|\s]/g, '_')}-${pr.id}.md`);
@@ -811,7 +826,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (body.mode === 'write') registerPicked(pr);   // 商品IDを確定させてから書かせる
-      const brief = body.mode === 'write' ? buildBrief(pr, db.inventory) : '';
+      const brief = body.mode !== 'write' ? ''
+        : (kind.isColumn(pr) ? buildColumnBrief(pr, columnMentions(pr)) : buildBrief(pr, db.inventory));
       const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current);
       const jobId = DB.newId();
       claude.startClaude(jobId, prompt, settings.aiModel, {
@@ -1131,6 +1147,12 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // コラムで触れてよい商品＝すでに公開ずみの記事で紹介しているもの。
+    // こうしておくと、送り先の記事が必ず存在します。
+    if (p === '/api/products/published') {
+      return send(res, 200, { items: products.usedInArticles() });
+    }
+
     if (p === '/api/eyecatch/references') {
       const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
       if (!pr) return send(res, 200, { items: [] });
@@ -1380,6 +1402,15 @@ function syncIdeas(db) {
   return changed;
 }
 
+// コラムで触れる商品の情報をそろえます。
+// 送り先（その商品を詳しく紹介している記事）も一緒に返します。
+function columnMentions(pr) {
+  const ids = Array.isArray(pr.columnProducts) ? pr.columnProducts : [];
+  if (!ids.length) return [];
+  const all = products.usedInArticles();
+  return ids.map((id) => all.find((x) => x.id === id)).filter(Boolean);
+}
+
 function newProject(db, src) {
   const id = DB.newId();
   // URLの決め方
@@ -1395,6 +1426,8 @@ function newProject(db, src) {
     id, slug,
     title: src.title || '', keyword: src.keyword || '', category: src.category || '',
     status: '下書き', createdAt: DB.today(),
+    // 商品紹介かコラムか。構成・執筆の材料・公開前チェックがこれで変わります。
+    kind: kind.of(src),
     products: [], eyecatch: null,
     ideaId: src.ideaId || null, ideaNote: src.ideaNote || '',
   };

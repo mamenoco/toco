@@ -397,6 +397,12 @@ async function openProject(id, wantStep, keepHash) {
   $('#previewFrame').srcdoc = '';
   PREVIEW_OF = '';
 
+  // 記事の種類を画面に反映します（商品紹介かコラムかで、この画面の中身が変わります）
+  const kd = CURRENT.kind || 'product';
+  $$('input[name=artKind]').forEach((r) => { r.checked = r.value === kd; });
+  COL_PICKED = Array.isArray(CURRENT.columnProducts) ? CURRENT.columnProducts.slice() : [];
+  applyKind(kd);
+
   fillMetaForm();
   renderPicked();
   renderReviewStep();
@@ -2773,4 +2779,93 @@ async function addIaSelected() {
   IA_ITEMS = [];
   renderIdeas();
   toast(`${r.added}件を記事ネタに追加しました`);
+}
+
+// ================================================================
+// 記事の種類（商品紹介 / コラム）
+// ================================================================
+// コラムは読み物です。商品を並べる記事ではないので、
+// 楽天の検索も口コミの取得も要りません。代わりに、
+// すでに商品紹介の記事で扱っている商品から選んで、軽く触れるだけにします。
+// そうしないと、その商品紹介の記事と同じ検索語で競ってしまいます。
+
+let COL_PRODUCTS = [];   // コラムで触れられる商品（公開ずみ記事で紹介ずみ）
+let COL_PICKED = [];     // この記事で触れる商品のID
+
+function currentKind() {
+  const el = document.querySelector('input[name=artKind]:checked');
+  return el ? el.value : 'product';
+}
+
+function applyKind(kind) {
+  const column = kind === 'column';
+  ['#productSearchBox', '#productPickedBox', '#reviewFetchBox'].forEach((sel) => {
+    const el = $(sel); if (el) el.hidden = column;
+  });
+  const box = $('#columnPickBox'); if (box) box.hidden = !column;
+
+  $('#kindNote').innerHTML = column
+    ? 'コラムでは比較表とスペック表を作りません。商品の紹介は2〜3文にとどめて、'
+      + '詳しい話は<b>その商品を紹介している記事へ送ります</b>。'
+    : '比較表・スペック表・商品ブロック（3〜4段落）を作る、いつもの型です。';
+
+  if (column) renderColumnProducts();
+}
+
+$$('input[name=artKind]').forEach((r) => r.addEventListener('change', async () => {
+  const kind = currentKind();
+  applyKind(kind);
+  if (CURRENT) {
+    await api('project/update', { id: CURRENT.id, kind });
+    CURRENT.kind = kind;
+  }
+}));
+
+async function renderColumnProducts() {
+  if (!COL_PRODUCTS.length) {
+    let r;
+    try { r = await api('products/published'); } catch (e) { return; }
+    COL_PRODUCTS = r.items || [];
+  }
+  const q = ($('#colFilter').value || '').trim();
+  const list = q ? COL_PRODUCTS.filter((x) => x.name.includes(q)) : COL_PRODUCTS;
+
+  $('#colProducts').innerHTML = list.length ? list.map((x) => `
+    <div class="item" style="align-items:flex-start">
+      <input type="checkbox" data-col="${esc(x.id)}" ${COL_PICKED.includes(x.id) ? 'checked' : ''}
+        style="margin:4px 8px 0 0">
+      ${x.image ? `<img src="${esc(x.image)}" style="width:44px;height:44px;object-fit:contain;margin-right:8px">` : ''}
+      <div style="flex:1;min-width:0">
+        <div class="t">${esc(x.name)}${x.owned ? ' <span class="tag ok">持っています</span>' : ''}</div>
+        <div class="note">送り先：${x.articles.map((a) => esc(a.title)).join(' / ')}</div>
+      </div>
+    </div>`).join('')
+    : '<p class="note">該当する商品がありません。商品紹介の記事を公開すると、ここに出てきます。</p>';
+
+  $('#colProducts').querySelectorAll('[data-col]').forEach((c) =>
+    c.addEventListener('change', () => {
+      const id = c.dataset.col;
+      if (c.checked) { if (!COL_PICKED.includes(id)) COL_PICKED.push(id); }
+      else COL_PICKED = COL_PICKED.filter((x) => x !== id);
+      saveColumnPicks();
+    }));
+  renderColumnPicked();
+}
+$('#colFilter').addEventListener('input', renderColumnProducts);
+
+function renderColumnPicked() {
+  const picked = COL_PICKED.map((id) => COL_PRODUCTS.find((x) => x.id === id)).filter(Boolean);
+  const over = picked.length > 4;
+  $('#colPickedNote').innerHTML = `${picked.length}点`
+    + (over ? ' <span style="color:var(--err)">コラムは2〜4点までにしてください。多いと商品紹介の記事と競います</span>' : '');
+  $('#colPicked').innerHTML = picked.map((x) => `
+    <div class="item"><div style="flex:1"><div class="t">${esc(x.name)}</div>
+      <div class="note">{{product:${esc(x.id)}}} ／ 送り先 {{link:${esc(x.articles[0].slug)}|…}}</div></div></div>`).join('');
+}
+
+async function saveColumnPicks() {
+  renderColumnPicked();
+  if (!CURRENT) return;
+  await api('project/update', { id: CURRENT.id, columnProducts: COL_PICKED });
+  CURRENT.columnProducts = COL_PICKED;
 }

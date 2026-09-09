@@ -87,4 +87,38 @@ function markOwned(list, inventory) {
   });
 }
 
-module.exports = { FILE, load, save, get, upsert, remove, suggestId, fromSearchItem, markOwned };
+// 公開ずみの記事で紹介している商品を集めます。
+//
+// コラムで触れてよいのは「詳しい紹介がすでにある商品」だけです。
+// そうしておくと、送り先の記事が必ず存在します。
+// どの記事で紹介しているかも一緒に返すので、リンク先をそのまま出せます。
+function usedInArticles() {
+  const articles = require('./articles.js');
+  const master = load();
+  const byId = {};
+
+  articles.list().filter((a) => a.status === 'publish').forEach((a) => {
+    const body = (articles.read(a.slug) || {}).body || '';
+    const seen = new Set();
+    let m;
+    const re = /\{\{product:([^}]+)\}\}/g;
+    while ((m = re.exec(body))) {
+      const id = m[1].trim();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const p = master.find((x) => x.id === id);
+      if (!p) continue;
+      if (!byId[id]) {
+        byId[id] = { id, name: p.name, image: p.image || '', owned: !!p.owned, articles: [] };
+      }
+      byId[id].articles.push({ slug: a.slug, title: a.title });
+    }
+  });
+
+  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+module.exports = {
+  FILE, load, save, get, upsert, remove, suggestId, fromSearchItem, markOwned,
+  usedInArticles,
+};

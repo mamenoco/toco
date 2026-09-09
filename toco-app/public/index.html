@@ -178,6 +178,28 @@
   <!-- ステップ1 -->
   <div class="stepbox" data-box="1">
     <div class="card">
+      <h3>記事の種類</h3>
+      <p class="note">種類によって、この画面の中身・執筆用の材料・公開前チェックが変わります。</p>
+      <div class="row">
+        <label style="margin:0"><input type="radio" name="artKind" value="product"> 商品紹介（おすすめ○選の比較記事）</label>
+        <label style="margin:0"><input type="radio" name="artKind" value="column"> コラム（読み物。商品は軽く触れるだけ）</label>
+      </div>
+      <p class="note" id="kindNote"></p>
+    </div>
+    <div class="card" id="columnPickBox" hidden>
+      <h3>この記事で触れる商品</h3>
+      <p class="note">コラムで触れてよいのは、<b>すでに商品紹介の記事で扱っている商品</b>だけです。
+        そうしておくと、送り先の記事が必ずあります。<b>2〜4点まで。</b>
+        紹介は2〜3文にとどめて、詳しい話はその記事へ送ります。</p>
+      <label>絞り込み<input id="colFilter" placeholder="商品名の一部（例：ブラシ）"></label>
+      <div id="colProducts" class="list" style="max-height:340px;overflow:auto"></div>
+      <div class="row" style="margin-top:10px">
+        <span class="note" id="colPickedNote">0点</span>
+      </div>
+      <div id="colPicked" class="list"></div>
+    </div>
+
+    <div class="card" id="productSearchBox">
       <h3>商品を探す</h3>
       <p class="note">「候補を自動で選ぶ」を押すと、楽天を60件ぶん調べて、同じ商品をまとめたうえで
         口コミ数・評価・価格帯のばらつきから10点前後に絞ります。そこから6〜7点を選んでください。</p>
@@ -197,7 +219,7 @@
       <div id="curateBox"></div>
       <div id="searchResults" class="list"></div>
     </div>
-    <div class="card">
+    <div class="card" id="productPickedBox">
       <h3>この記事に載せる商品 <span class="tag" id="pickedCount">0点</span></h3>
       <p class="note">価格帯とサイズが散るように選ぶと、比較記事として読みやすくなります。</p>
       <div id="pickedList" class="list"></div>
@@ -207,7 +229,7 @@
       </div>
       <div id="snippetBox"></div>
     </div>
-    <div class="card">
+    <div class="card" id="reviewFetchBox">
       <h3>口コミを読み込む</h3>
       <p class="note">ボタンを押したときだけ取得します。取得したものは保存され、二度目は取りにいきません。
         楽天のページに連続でアクセスしないよう、1件ごとに間隔を空けます。

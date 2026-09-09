@@ -16,6 +16,85 @@ const SPEC_PRESET = {
   'しつけ・暮らし': ['タイプ', 'サイズ', '素材', '対象', '備考'],
 };
 
+// コラム用の材料。商品紹介とは記事の役目が違うので、別に組み立てます。
+//
+// コラムは読み物です。商品は「この場面ならこれ」と軽く触れるだけにして、
+// 詳しい比較は商品紹介の記事へ送ります。そうしないと、
+// 同じ検索語で自分の記事どうしが competing してしまいます。
+// 送り先の記事。まだ無いときにも落ちないようにします。
+function firstArticle(m) {
+  const a = (m && m.articles && m.articles[0]) || {};
+  return { slug: a.slug || 'スラッグ', title: a.title || '記事名' };
+}
+
+function buildColumnBrief(project, mentions) {
+  const L = [];
+  L.push(`# 執筆用ブリーフ（コラム）：${project.title || project.keyword}`);
+  L.push('');
+  L.push('このファイルをClaude Codeに読ませて記事を書いてください。');
+  L.push('');
+  L.push('## 記事の条件');
+  L.push('');
+  L.push(`- キーワード：${project.keyword}`);
+  L.push(`- カテゴリ：${project.category || '（未設定）'}`);
+  L.push('- 種類：**コラム**（商品を並べる比較記事ではありません）');
+  L.push(`- 作成日：${today()}`);
+  if (project.ideaNote) L.push(`- この記事のねらい：${project.ideaNote}`);
+  L.push('');
+  L.push('## コラムの役目');
+  L.push('');
+  L.push('この記事は、まだ商品を買う気になっていない読者が読む入り口です。');
+  L.push('悩みや疑問に答えることが本題で、商品を売ることは本題ではありません。');
+  L.push('商品は「この場面ならこれ」と軽く触れるだけにして、');
+  L.push('**詳しい比較は、すでにある商品紹介の記事へ送ってください。**');
+  L.push('');
+  L.push('## 守るルール');
+  L.push('');
+  L.push('プロジェクト直下の CLAUDE.md（スタイルガイド）の「コラム記事の型」に従ってください。とくに以下。');
+  L.push('');
+  L.push('1. 比較表は作らない。スペック表も作らない');
+  L.push('2. 商品ごとの紹介は**2〜3文まで**。良い点と気になる点を並べる書き方はしない');
+  L.push('3. 商品に触れたら、**必ずその商品を詳しく紹介している記事へのリンクを置く**');
+  L.push('4. 触れてよい商品は下に挙げたものだけ。ほかの商品を持ち出さない');
+  L.push('5. 実体験は、下で「体験を書いてよい」とされたものだけ');
+  L.push('6. 誇大表現・保証表現を使わない。効果や結果を断定しない');
+  L.push('7. 価格は本文に書かない');
+  L.push('');
+  L.push('## この記事で触れる商品');
+  L.push('');
+  if (!mentions.length) {
+    L.push('（商品には触れません。読み物として書いてください）');
+  } else {
+    L.push('見出しに商品名を置き、その直後にカードの記法を1行、そのあと2〜3文。');
+    L.push('最後に送り先の記事へのリンクを置きます。書き方の見本：');
+    L.push('');
+    L.push('```');
+    L.push('### ' + (mentions[0].name || '商品名'));
+    L.push('');
+    L.push('{{product:' + (mentions[0].id || 'ID') + '}}');
+    L.push('');
+    L.push('（この場面でなぜこれなのかを2〜3文。仕様の羅列にしない）');
+    L.push('');
+    L.push('詳しくは{{link:' + firstArticle(mentions[0]).slug + '|'
+      + firstArticle(mentions[0]).title + '}}で紹介しています。');
+    L.push('```');
+    L.push('');
+    mentions.forEach((m, i) => {
+      L.push(`### ${i + 1}. ${m.name}`);
+      L.push('');
+      L.push('- **記事に書く記法：`{{product:' + m.id + '}}`**');
+      L.push('- 送り先の記事：' + (m.articles || []).map((a) => `{{link:${a.slug}|${a.title}}}`).join(' / '));
+      L.push('- 体験：' + (m.owned ? 'あり（実際に使っているので、体験を1文だけ書いてよい）' : 'なし（体験を書かない）'));
+      if (m.why) L.push('- この記事で触れる理由：' + m.why);
+      L.push('');
+    });
+  }
+  L.push('## 出力してほしいもの');
+  L.push('');
+  L.push('CLAUDE.mdの「コラム記事の型」に沿った記事本文（Markdown）を1本。');
+  return L.join('\n');
+}
+
 function buildBrief(project, inventory, styleGuide) {
   const L = [];
   L.push(`# 執筆用ブリーフ：${project.title || project.keyword}`);
@@ -121,4 +200,4 @@ function buildBrief(project, inventory, styleGuide) {
 }
 
 
-module.exports = { buildBrief, SPEC_PRESET };
+module.exports = { buildBrief, buildColumnBrief, SPEC_PRESET };
