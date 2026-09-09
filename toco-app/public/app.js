@@ -1039,6 +1039,7 @@ function renderPlaceholders() {
     if (!cur) return toast('場所が見つかりません。本文を確認してください');
     if (!val) return toast('文章を書いてください');
     const lines = $('#articleText').value.split('\n');
+    pushUndo('文章の書き換え');
     lines.splice(cur.start, cur.end - cur.start + 1, val);
     $('#articleText').value = lines.join('\n');
     await saveProject({ article: $('#articleText').value });
@@ -1104,6 +1105,7 @@ async function renderPreview(opts) {
       const b = e.target.closest && e.target.closest('[data-ln]');
       if (b) openBlockEditor(b, d);
     });
+    enableCardDrag(d);
     if (keep) {
       // CSSと画像があとから読み込まれると文書の高さが変わり、
       // 一度だけ戻しても位置がずれます。狙った位置に着くまで繰り返します。
@@ -1213,6 +1215,7 @@ async function applyDecoration(kind) {
   if (kind === 'clear') {
     const stripped = src.replace('==' + s.text + '==', s.text).replace('**' + s.text + '**', s.text);
     if (stripped === src) return toast('この部分には装飾が付いていないようです');
+    pushUndo('装飾を外す');
     $('#articleText').value = writeBlock(s.from, s.to, stripped);
   } else {
     const wrap = '==';
@@ -1234,6 +1237,7 @@ async function applyDecoration(kind) {
     const a = tok[at] ? tok[at].s : map[at];
     const b = tok[last] ? tok[last].e : map[last] + 1;
     const out = src.slice(0, a) + wrap + src.slice(a, b) + wrap + src.slice(b);
+    pushUndo('装飾を付ける');
     $('#articleText').value = writeBlock(s.from, s.to, out);
   }
 
@@ -1261,6 +1265,7 @@ $('#btnBoldToMark').addEventListener('click', async () => {
   if (!n) return toast('本文中の太字は見つかりませんでした');
   if (!confirm(`本文中の太字 ${n}か所 をマーカーに変えます。\n` +
     '「結論の1文」「ブランド名」「キャッチ」など、行まるごとの太字はそのままです。よろしいですか？')) return;
+  pushUndo('太字をマーカーに変える');
   $('#articleText').value = next;
   await saveProject({ article: next });
   updateChars();
@@ -1299,6 +1304,7 @@ $('#btnInsertCard').addEventListener('click', async () => {
     if (!slug) return toast('記事を選んでください');
     const lines = $('#articleText').value.split('\n');
     const at = LAST_BLOCK ? LAST_BLOCK[1] + 1 : lines.length;
+    pushUndo('記事カードを入れる');
     lines.splice(at, 0, '', `{{card:${slug}}}`);
     $('#articleText').value = lines.join('\n').replace(/\n{3,}/g, '\n\n');
     closeModal();
@@ -1350,6 +1356,7 @@ function openBlockEditor(block, d) {
     const next = ta.value;
     close();
     if (next === src) return;
+    pushUndo('段落の編集');
     $('#articleText').value = writeBlock(from, to, next);
     await saveProject({ article: $('#articleText').value });
     updateChars();
@@ -1572,6 +1579,43 @@ $('#btnMetaSuggest').addEventListener('click', () => {
   if ($('#pubTitle').value.trim() && !confirm('いまのタイトルと説明文を、本文から作り直したものに置き換えます。よろしいですか？')) return;
   suggestMeta(true);
 });
+
+// ---- 元に戻す ----
+//
+// 公開前チェックの画面では、装飾・記事カードの挿入・段落の書き換え・商品の削除など、
+// いろいろな操作で本文が書き換わります。取り消せないと、消してしまったときに戻せません。
+// 本文を書き換える前にここへ控えておき、1手ずつ戻せるようにします。
+
+const UNDO = [];
+const UNDO_MAX = 40;
+
+// 書き換える直前に呼びます。label は「何をしたか」の表示に使います。
+function pushUndo(label) {
+  UNDO.push({ text: $('#articleText').value, label: label || '編集' });
+  if (UNDO.length > UNDO_MAX) UNDO.shift();
+  renderUndo();
+}
+
+function renderUndo() {
+  const b = $('#btnUndo');
+  if (!b) return;
+  b.disabled = !UNDO.length;
+  b.textContent = UNDO.length ? `元に戻す（${UNDO.length}）` : '元に戻す';
+  b.title = UNDO.length ? `直前の操作：${UNDO[UNDO.length - 1].label}` : '';
+}
+
+function clearUndo() { UNDO.length = 0; renderUndo(); }
+
+async function undoOnce() {
+  if (!UNDO.length) return toast('戻せる操作がありません');
+  const last = UNDO.pop();
+  $('#articleText').value = last.text;
+  renderUndo();
+  await saveProject({ article: last.text });
+  updateChars();
+  await renderPreview({ keepScroll: true, skipBuild: true });
+  toast(`「${last.label}」を取り消しました`);
+}
 
 // ---- ステップ4：公開の設定 ----
 function fillMetaForm() {
@@ -2873,4 +2917,107 @@ async function saveColumnPicks() {
   if (!CURRENT) return;
   await api('project/update', { id: CURRENT.id, columnProducts: COL_PICKED });
   CURRENT.columnProducts = COL_PICKED;
+}
+
+// 元に戻す。ボタンと ⌘Z の両方から使えます。
+$('#btnUndo').addEventListener('click', undoOnce);
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key !== 'z' || e.shiftKey) return;
+  // 文章を打っている最中は、その入力欄の取り消しを優先します
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+  // 公開前チェックの画面にいるときだけ効かせます
+  const box = document.querySelector('.stepbox[data-box="3"]');
+  if (!box || box.hidden) return;
+  e.preventDefault();
+  undoOnce();
+});
+
+// ---- 記事カードをドラッグで動かす ----
+//
+// 記事カードは「いま見ているブロックの次」に入ります。
+// どこに入ったのかが分かりにくいので、あとから掴んで動かせるようにします。
+// 本文（Markdown）では {{card:スラッグ}} の1行なので、その行を移すだけで済みます。
+
+function isCardLine(line) {
+  return /^\{\{card:[a-z0-9-]+\}\}\s*$/.test(String(line || '').trim());
+}
+
+function enableCardDrag(d) {
+  const blocks = [...d.querySelectorAll('[data-ln]')];
+  const lines = $('#articleText').value.split('\n');
+
+  const st = d.createElement('style');
+  st.textContent = `
+    .card-move{position:relative;cursor:grab}
+    .card-move:hover{outline:2px dashed #e08aa0;outline-offset:4px}
+    .card-move::before{content:'⠿ ドラッグで移動';position:absolute;top:-11px;left:8px;
+      background:#e08aa0;color:#fff;font-size:11px;padding:1px 8px;border-radius:9px;z-index:5}
+    .card-drag{opacity:.4}
+    .drop-before{box-shadow:0 -3px 0 #e08aa0}
+    .drop-after{box-shadow:0 3px 0 #e08aa0}`;
+  d.head.appendChild(st);
+
+  let dragging = null;
+  const clearMarks = () => blocks.forEach((b) => b.classList.remove('drop-before', 'drop-after'));
+
+  blocks.forEach((el) => {
+    const ln = el.getAttribute('data-ln').split(',').map(Number);
+    if (!isCardLine(lines[ln[0]])) return;
+    el.classList.add('card-move');
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => {
+      dragging = { el, from: ln[0], to: ln[1] };
+      el.classList.add('card-drag');
+      try { e.dataTransfer.setData('text/plain', 'card'); } catch (err) { /* 一部の環境で失敗します */ }
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('card-drag');
+      clearMarks();
+      dragging = null;
+    });
+  });
+
+  if (!blocks.some((b) => b.classList.contains('card-move'))) return;
+
+  blocks.forEach((el) => {
+    el.addEventListener('dragover', (e) => {
+      if (!dragging || el === dragging.el) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const r = el.getBoundingClientRect();
+      clearMarks();
+      el.classList.add((e.clientY - r.top) < r.height / 2 ? 'drop-before' : 'drop-after');
+    });
+    el.addEventListener('drop', async (e) => {
+      if (!dragging || el === dragging.el) return;
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const before = (e.clientY - r.top) < r.height / 2;
+      const target = el.getAttribute('data-ln').split(',').map(Number);
+      const move = dragging;
+      dragging = null;
+      await moveCardLine(move.from, move.to, before ? target[0] : target[1] + 1);
+    });
+  });
+}
+
+// 本文のなかで、カードの行を別の場所へ移します。
+async function moveCardLine(from, to, at) {
+  if (at >= from && at <= to + 1) return;   // 同じ場所なら何もしません
+  const lines = $('#articleText').value.split('\n');
+  const block = lines.slice(from, to + 1);
+
+  pushUndo('記事カードの移動');
+  lines.splice(from, to - from + 1);
+  // 取り除いたぶん、後ろの位置がずれます
+  const dest = at > to ? at - (to - from + 1) : at;
+  lines.splice(dest, 0, ...block);
+
+  $('#articleText').value = lines.join('\n').replace(/\n{3,}/g, '\n\n');
+  await saveProject({ article: $('#articleText').value });
+  updateChars();
+  await renderPreview({ keepScroll: true, skipBuild: true });
+  toast('記事カードを移動しました');
 }

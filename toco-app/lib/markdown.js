@@ -151,15 +151,16 @@ function render(md, opts) {
     const am = line.match(/^<a id="([^"]+)"><\/a>$/);
     if (am) { pendingAnchor = am[1]; i++; continue; }
 
-    // 画像。単独の行に ![キャプション](パス) と書きます。
-    // キャプションは figcaption と alt の両方に使います。
+    // 画像。単独の行に ![説明](パス) と書きます。
+    // 説明は alt にだけ入れます。画像の下には出しません。
+    // 画面に出る文字が増えると本文の流れが切れるためで、
+    // alt は読み上げと検索エンジンのために必要です。
     const im = line.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+(\d+)x(\d+))?\)$/);
     if (im) {
       const cap = im[1].trim();
       const size = im[3] ? ` width="${im[3]}" height="${im[4]}"` : '';
       push('<figure class="ph"><img src="' + esc(im[2]) + '" alt="' + esc(cap) + '"'
-        + size + ' loading="lazy" decoding="async">'
-        + (cap ? '<figcaption>' + esc(cap) + '</figcaption>' : '') + '</figure>');
+        + size + ' loading="lazy" decoding="async"></figure>');
       i++; continue;
     }
 
