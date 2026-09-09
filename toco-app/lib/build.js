@@ -150,9 +150,16 @@ function replaceLegacyProductLines(md) {
 
 // ---------- 部品のHTML ----------
 
-function menuHtml() {
+// いま見ているページのメニュー項目に印を付けます。
+// リンク先が完全に一致したものだけを「現在地」とみなすので、
+// トップの中の位置を指す `/#categories` のような項目は光りません。
+function menuHtml(currentPath) {
   return '<ul class="menu">'
-    + config.menu.map(([label, href]) => `<li><a href="${esc(href)}">${esc(label)}</a></li>`).join('')
+    + config.menu.map(([label, href]) => {
+      const here = !!currentPath && href === currentPath;
+      return `<li${here ? ' class="current-menu-item"' : ''}>`
+        + `<a href="${esc(href)}"${here ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`;
+    }).join('')
     + '</ul>';
 }
 
@@ -214,8 +221,8 @@ function layout(o) {
     HEAD: headTags(o),
     BODYCLASS: o.bodyClass || '',
     CONTENT: o.content,
-    MENU: menuHtml(),
-    FOOTERMENU: menuHtml(),
+    MENU: menuHtml(o.path),
+    FOOTERMENU: menuHtml(o.path),
     SITENAME: esc(config.name),
     TAGLINE: esc(config.tagline),
     YEAR: o.year,
@@ -280,6 +287,16 @@ function buildAssets() {
       [
         '.category-section{padding-top:52px}',
         '@media(max-width:600px){.category-section{padding-top:46px}}',
+      ].join(''),
+      // メニューの現在地。
+      // 旧テーマは「1つめの項目（ホーム）を常に光らせる」作りだったので、
+      // どのページでもホームに線が付いたままでした。現在地の項目だけに付け直します。
+      [
+        '.nav-inner li:first-child>a{color:inherit}',
+        '.nav-inner li:first-child>a::after{content:none}',
+        '.nav-inner li.current-menu-item>a{color:var(--pink-dark)}',
+        '.nav-inner li.current-menu-item>a::after{content:"";position:absolute;',
+        'right:0;bottom:0;left:0;height:3px;border-radius:3px 3px 0 0;background:var(--pink)}',
       ].join(''),
       // ヘッダーの検索窓。
       // 旧テーマではボタンを押すと別の入力欄（検索ドロワー）が開く作りでしたが、
