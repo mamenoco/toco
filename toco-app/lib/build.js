@@ -299,6 +299,9 @@ function buildAssets() {
         '.nav-inner li.current-menu-item>a{color:var(--pink-dark)}',
         '.nav-inner li.current-menu-item>a::after{content:"";position:absolute;',
         'right:0;bottom:0;left:0;height:3px;border-radius:3px 3px 0 0;background:var(--pink)}',
+        // スマホのメニュー（ハンバーガーを押して出てくる方）も同じ作りだったので直します
+        '.mobile-nav-sheet li:first-child a{color:inherit}',
+        '.mobile-nav-sheet li.current-menu-item a{color:var(--pink-dark)}',
       ].join(''),
       // ヘッダーの検索窓。
       // 旧テーマではボタンを押すと別の入力欄（検索ドロワー）が開く作りでしたが、
