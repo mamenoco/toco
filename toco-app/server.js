@@ -544,6 +544,7 @@ const server = http.createServer(async (req, res) => {
       // 記事の種類と、コラムで触れる商品
       if (body.kind === 'column' || body.kind === 'product') db.projects[i].kind = body.kind;
       if (Array.isArray(body.columnProducts)) db.projects[i].columnProducts = body.columnProducts;
+      if (body.ng != null) db.projects[i].ng = String(body.ng);
       const patch = Object.assign({}, body);
       delete patch.article;
       db.projects[i] = Object.assign(db.projects[i], patch);

@@ -384,6 +384,9 @@ async function openProject(id, wantStep, keepHash) {
   $('#edTitle').textContent = CURRENT.title || CURRENT.keyword || '（無題）';
   $('#edMeta').textContent = `${catName(CURRENT.category)}　/${CURRENT.slug}/`;
   $('#searchKeyword').value = CURRENT.keyword || '';
+  // 除外キーワードは記事ごとに違います（トイレなら「砂 シーツ」、キャリーなら「犬 猫」など）。
+  // 記事に紐づけて覚えておき、開くたびにその記事のものに入れ替えます。
+  $('#searchNg').value = CURRENT.ng || '';
   $('#articleText').value = CURRENT.article || '';
   $('#briefPreview').value = '';
   $('#briefPath').textContent = '';
@@ -501,7 +504,14 @@ $('#btnSearch').addEventListener('click', async () => {
 
 // ---- 候補の自動選出 ----
 $('#searchKeyword').addEventListener('input', () => { CURATE_GENRE = ''; });
-$('#searchNg').addEventListener('input', () => { CURATE_GENRE = ''; });
+$('#searchNg').addEventListener('input', () => {
+  CURATE_GENRE = '';
+  if (!CURRENT) return;
+  CURRENT.ng = $('#searchNg').value;
+  clearTimeout(NG_TIMER);
+  NG_TIMER = setTimeout(() => api('project/update', { id: CURRENT.id, ng: CURRENT.ng }), 600);
+});
+let NG_TIMER = null;
 
 $('#btnCurate').addEventListener('click', async () => {
   const kw = $('#searchKeyword').value.trim();
