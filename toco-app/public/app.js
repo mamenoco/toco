@@ -394,6 +394,27 @@ async function openProject(id, wantStep, keepHash) {
   $('#checkResults').innerHTML = '';
   $('#checkStatus').innerHTML = '';
   $('#checkSolved').innerHTML = '';
+
+  // 前の記事の名残を片づけます。
+  // 残っていると、いま開いている記事の情報だと思って読んでしまいます。
+  ['#aiInstruction', '#aiResult'].forEach((sel) => {
+    const el = $(sel); if (el) el.value = '';
+  });
+  [
+    '#searchNote',      // 「○件見つかりました」など
+    '#fetchAllNote',    // 「口コミを○件取得しました」
+    '#masterNote',      // 商品マスタへの登録結果
+    '#aiStatus', '#aiPhase', '#aiCount', '#aiDiffNote',
+    '#copyNote', '#markNote', '#bodyImgNote', '#metaSaved', '#eyeGenNote', '#eyeSaved',
+  ].forEach((sel) => {
+    const el = $(sel); if (el) el.textContent = '';
+  });
+  [
+    '#curateBox', '#searchResults', '#reviewList', '#snippetBox', '#copyResult',
+  ].forEach((sel) => {
+    const el = $(sel); if (el) el.innerHTML = '';
+  });
+  const prog = $('#aiProgress'); if (prog) prog.style.display = 'none';
   CHECKS = []; PREV_LABELS = null;
   // 前に開いていた記事のプレビューを消します。
   // 残しておくと、別の記事を開いたときに一瞬だけ前の記事が見えてしまいます。
