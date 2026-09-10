@@ -27,6 +27,71 @@
     }
   }
 
+  // ---- ピックアップ記事の横スライド ----
+  // スクロールできる状態のときだけ左右のボタンを出します。
+  // JSが動かない環境でも、指やトラックパッドで横に送れます。
+  initPickupSlider();
+
+  function initPickupSlider() {
+    var track = document.querySelector('.pickup-grid');
+    var prev = document.querySelector('.pickup-nav.prev');
+    var next = document.querySelector('.pickup-nav.next');
+    if (!track || !prev || !next) return;
+
+    // カードの左端が並ぶ位置の一覧。
+    // ここを送り先にすると、CSSの吸着（scroll-snap）と行き先がずれません。
+    function stops() {
+      var cards = track.querySelectorAll('.pickup-card');
+      var list = [];
+      if (!cards.length) return [0];
+      var base = cards[0].offsetLeft;
+      for (var i = 0; i < cards.length; i++) list.push(cards[i].offsetLeft - base);
+      return list;
+    }
+
+    // dir が 1 なら次のカードへ、-1 なら前のカードへ
+    function go(dir) {
+      var list = stops();
+      var max = track.scrollWidth - track.clientWidth;
+      var now = track.scrollLeft;
+      var target = dir > 0 ? max : 0;
+      if (dir > 0) {
+        for (var i = 0; i < list.length; i++) {
+          if (list[i] > now + 2) { target = Math.min(list[i], max); break; }
+        }
+      } else {
+        for (var j = list.length - 1; j >= 0; j--) {
+          if (list[j] < now - 2) { target = list[j]; break; }
+        }
+      }
+      // 古いブラウザは scrollTo に指定を渡せないので、その場合は直接動かします
+      try {
+        track.scrollTo({ left: target, behavior: 'smooth' });
+      } catch (e) {
+        track.scrollLeft = target;
+      }
+      // 動き終わったころに、もう一度ボタンの出し分けを合わせます。
+      // スクロールの通知だけに頼ると、端に着いたのにボタンが消えないことがあるためです。
+      window.setTimeout(update, 450);
+      window.setTimeout(update, 950);
+    }
+
+    function update() {
+      var max = track.scrollWidth - track.clientWidth;
+      var canScroll = max > 2;
+      prev.hidden = !canScroll;
+      next.hidden = !canScroll;
+      prev.disabled = track.scrollLeft <= 2;
+      next.disabled = track.scrollLeft >= max - 2;
+    }
+
+    prev.addEventListener('click', function () { go(-1); });
+    next.addEventListener('click', function () { go(1); });
+    track.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+
   // ---- 検索結果ページ ----
   // ヘッダーの検索窓は /search/?q=… に飛びます。
   // 静的サイトなので検索する仕組みがサーバー側にありません。

@@ -290,6 +290,38 @@ function buildAssets() {
         '.category-section{padding-top:52px}',
         '@media(max-width:600px){.category-section{padding-top:46px}}',
       ].join(''),
+      // ピックアップ記事の横スライド。
+      // 旧テーマは5件を並べるだけの格子でしたが、15件を左右に送れる形にしました。
+      // 格子の指定と噛み合わないので、display を flex に変えて上書きしています。
+      [
+        '.pickup-viewport{position:relative}',
+        '.pickup-grid{display:flex;gap:24px;overflow-x:auto;overscroll-behavior-x:contain;',
+        'scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;',
+        '-ms-overflow-style:none;padding-bottom:2px}',
+        '.pickup-grid::-webkit-scrollbar{width:0;height:0}',
+        '.pickup-grid:focus-visible{outline:2px solid var(--pink);outline-offset:4px;border-radius:10px}',
+        '.pickup-card{flex:0 0 calc((100% - 96px)/5);scroll-snap-align:start}',
+        // 左右のボタン。JSが必要なときだけ出します（押せない側は消えます）
+        '.pickup-nav{position:absolute;top:32%;z-index:3;width:40px;height:40px;',
+        'display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:50%;',
+        'background:rgba(255,255,255,.94);color:var(--pink-dark);cursor:pointer;',
+        'transform:translateY(-50%);box-shadow:0 4px 14px rgba(90,68,59,.14);',
+        'transition:box-shadow .2s ease,opacity .2s ease}',
+        '.pickup-nav:hover{box-shadow:0 6px 18px rgba(90,68,59,.22)}',
+        '.pickup-nav[disabled]{opacity:0;pointer-events:none}',
+        '.pickup-nav.prev{left:-8px}',
+        '.pickup-nav.next{right:-8px}',
+        '.pickup-nav svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;',
+        'stroke-linecap:round;stroke-linejoin:round}',
+        '@media(max-width:900px){.pickup-grid{gap:20px}',
+        '.pickup-card{flex-basis:calc((100% - 40px)/3)}}',
+        // スマホは指で送るのでボタンは出さず、次のカードが少し見える幅にします
+        '@media(max-width:600px){.pickup-nav{display:none}',
+        '.pickup-grid{gap:14px}',
+        '.pickup-card{flex-basis:76%;display:block}',
+        '.pickup-image{aspect-ratio:1.55}',
+        '.pickup-card h3{margin:13px 0 6px}}',
+      ].join(''),
       // メニューの現在地。
       // 旧テーマは「1つめの項目（ホーム）を常に光らせる」作りだったので、
       // どのページでもホームに線が付いたままでした。現在地の項目だけに付け直します。
