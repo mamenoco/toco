@@ -110,21 +110,29 @@
       return list;
     }
 
-    // dir が 1 なら次のカードへ、-1 なら前のカードへ
+    // dir が 1 なら先へ、-1 なら戻る。1回で3枚ぶん送ります
+    var STEP = 3;
+
     function go(dir) {
       var list = stops();
       var max = track.scrollWidth - track.clientWidth;
       var now = track.scrollLeft;
-      var target = dir > 0 ? max : 0;
-      if (dir > 0) {
-        for (var i = 0; i < list.length; i++) {
-          if (list[i] > now + 2) { target = Math.min(list[i], max); break; }
-        }
-      } else {
-        for (var j = list.length - 1; j >= 0; j--) {
-          if (list[j] < now - 2) { target = list[j]; break; }
-        }
+
+      // いま左端に見えているカードが何枚目か
+      var index = 0;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] <= now + 2) index = i;
       }
+
+      var next = index + dir * STEP;
+      if (next < 0) next = 0;
+      if (next > list.length - 1) next = list.length - 1;
+      var target = Math.min(list[next], max);
+
+      // 右端の手前で止まってしまわないように、進めないときは端まで送ります
+      if (dir > 0 && target <= now + 2) target = max;
+      if (dir < 0 && target >= now - 2) target = 0;
+
       // 古いブラウザは scrollTo に指定を渡せないので、その場合は直接動かします
       try {
         track.scrollTo({ left: target, behavior: 'smooth' });
