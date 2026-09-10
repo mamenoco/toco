@@ -76,9 +76,12 @@ async function rakutenSearch(appId, accessKey, keyword, hits, page, opts) {
     const now = await currentIp();
     throw new Error(
       '楽天APIに接続できませんでした（接続元のIPアドレスが許可されていません）。\n\n'
-      + (now ? `いまのIPアドレス： ${now}\n\n` : '')
-      + '楽天ウェブサービスの管理画面（https://webservice.rakuten.co.jp/app/list）を開いて、'
-      + 'このIPを「Allowed IP addresses」に追加してください。');
+      + '楽天ウェブサービスの管理画面（https://webservice.rakuten.co.jp/app/list）を開き、\n'
+      + 'Edit →「Allowed IP addresses」を次の1行だけにしてください。\n\n'
+      + '    0.0.0.0/0\n\n'
+      + 'これで、回線のIPが変わっても登録し直さずに済みます。\n'
+      + 'IPを1つずつ足す方法は、契約回線によってはIPが頻繁に変わるため追いつきません。\n\n'
+      + (now ? `（参考：いまのIPアドレスは ${now} です）` : ''));
   }
   if (!res.ok) throw new Error(`楽天API: HTTP ${res.status}`);
   return (json.Items || []).map((w) => {
