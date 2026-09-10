@@ -189,10 +189,10 @@ function columnRow(a) {
 </a>`;
 }
 
-function archiveCard(a) {
+function archiveCard(a, withTags) {
   // タグはカード全体のリンクの外に置きます。
   // リンクの中にリンクを入れることはできないためです。
-  const tags = (a.tags || []).length
+  const tags = withTags !== false && (a.tags || []).length
     ? `\n  <div class="archive-tags">`
       + a.tags.map((t) => `<a href="/tag/${encodeURIComponent(t)}/">#${esc(t)}</a>`).join('')
       + `</div>` : '';
@@ -378,6 +378,18 @@ function buildAssets() {
         '.search-cats a:hover{box-shadow:var(--shadow)}',
         '@media(max-width:600px){.archive-header .search-page-form{height:42px}',
         '.search-page-form button{width:76px}.search-note{padding:18px 16px}}',
+      ].join(''),
+      // 一覧ページの見出しの下に出すキーワード
+      [
+        '.archive-keywords{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 0}',
+        '.archive-keywords>span{color:#a3968f;font-size:11px;letter-spacing:.06em}',
+        '.archive-keywords a{padding:6px 13px;border:1px solid #eadfd9;border-radius:999px;',
+        'background:#fff;color:var(--text);font-size:12px;text-decoration:none;',
+        'transition:color .15s ease,box-shadow .2s ease}',
+        '.archive-keywords a:hover{color:var(--pink-dark);box-shadow:var(--shadow)}',
+        '.archive-header{margin-bottom:26px}',
+        '@media(max-width:600px){.archive-keywords{gap:6px;margin-top:12px}',
+        '.archive-keywords a{padding:5px 11px;font-size:11px}}',
       ].join(''),
       // 一覧カードのタグ（カテゴリ一覧・タグ一覧）
       [
@@ -756,7 +768,8 @@ function buildArchive(o, ctx) {
   const pages = Math.max(1, Math.ceil(list.length / per));
   for (let i = 0; i < pages; i++) {
     const items = list.slice(i * per, (i + 1) * per);
-    const cards = items.length ? items.map(archiveCard).join('\n')
+    const cards = items.length
+      ? items.map((x) => archiveCard(x, o.cardTags !== false)).join('\n')
       : '<p>記事が見つかりませんでした。</p>';
     let pagination = '';
     if (pages > 1) {
@@ -769,7 +782,9 @@ function buildArchive(o, ctx) {
       }
       pagination = `<nav class="navigation pagination"><div class="nav-links">${links.join('')}</div></nav>`;
     }
-    const content = fill(readTpl('archive.html'), { HEADING: esc(o.heading), CARDS: cards, PAGINATION: pagination });
+    const content = fill(readTpl('archive.html'), {
+      HEADING: esc(o.heading), KEYWORDS: keywordBar(o.keywords), CARDS: cards, PAGINATION: pagination,
+    });
     const out = i === 0 ? `${dir}index.html` : `${dir}page/${i + 1}/index.html`;
     write(out.replace(/^\//, ''), layout({
       path: i === 0 ? url : `${url}page/${i + 1}/`,
@@ -779,6 +794,22 @@ function buildArchive(o, ctx) {
       bodyClass: 'archive', content, ...ctx,
     }));
   }
+}
+
+// 一覧ページの見出しの下に出すキーワード。多く使われている順に並べます
+function keywordBar(names) {
+  if (!names || !names.length) return '';
+  return '<div class="archive-keywords"><span>キーワード</span>'
+    + names.map((t) => `<a href="/tag/${encodeURIComponent(t)}/">#${esc(t)}</a>`).join('')
+    + '</div>';
+}
+
+// 記事の集まりから、使われているタグを多い順に取り出します
+function keywordsOf(list) {
+  const counts = {};
+  list.forEach((a) => (a.tags || []).forEach((t) => { counts[t] = (counts[t] || 0) + 1; }));
+  return Object.keys(counts)
+    .sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ja'));
 }
 
 // 公開記事に付いているタグを、使われている数の多い順に集めます
@@ -939,10 +970,14 @@ function build(opts) {
   drafts.forEach((a) => buildSingle(a, null, null, Object.assign({}, ctx, { draft: true })));
 
   config.categories.forEach((c) => {
+    const list = published.filter((a) => a.category === c.slug);
     buildArchive({
       dir: `/category/${c.slug}/`,
       heading: c.name,
-      list: published.filter((a) => a.category === c.slug),
+      list,
+      // カードごとには出さず、見出しの下にまとめて出します
+      cardTags: false,
+      keywords: keywordsOf(list),
     }, ctx);
   });
 
