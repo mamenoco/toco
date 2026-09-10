@@ -3,7 +3,7 @@ title: うさぎの換毛期はいつ？期間と乗り切り方について詳�
 slug: rabbit-molting
 category: column
 tags: [換毛期, 抜け毛対策, ブラッシング]
-date: 2026-09-09
+date: 2026-09-10
 updated: 2026-09-10
 description: うさぎの換毛期は春と秋の年2回、2週間から1か月ほどが目安です。飲み込んだ毛への備えや、ブラッシングと掃除で抜け毛を減らすコツ、換毛期に使いやすいブラシまで、落ち着いて乗り切るための見方をまとめています。
 eyecatch: /assets/eyecatch/rabbit-molting.jpg

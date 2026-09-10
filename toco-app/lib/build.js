@@ -711,7 +711,7 @@ function buildFrontPage(published, ctx) {
   <small>${c.lead}</small>
 </a>`).join('\n');
 
-  const pickup = published.slice(0, 5);
+  const pickup = published.slice(0, 15);
   let columns = published.filter((a) => a.category === 'column').slice(0, 3);
   if (!columns.length) columns = pickup.slice(0, 3);
 

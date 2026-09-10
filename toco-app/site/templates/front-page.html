@@ -16,7 +16,11 @@
 
     <section class="pickup-section" id="pickup"><div class="page-width">
         <div class="center-heading"><span class="heading-flora flora-left" aria-hidden="true"></span><h2>ピックアップ記事</h2><span class="heading-flora pickup-flora-right" aria-hidden="true"></span></div>
-        <div class="pickup-grid">{{PICKUP}}</div>
+        <div class="pickup-viewport">
+            <button class="pickup-nav prev" type="button" aria-label="前の記事を見る" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+            <div class="pickup-grid" role="region" aria-label="ピックアップ記事" tabindex="0">{{PICKUP}}</div>
+            <button class="pickup-nav next" type="button" aria-label="次の記事を見る" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+        </div>
     </div></section>
 
     <section class="lower-section page-width" id="column">
