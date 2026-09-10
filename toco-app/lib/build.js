@@ -190,10 +190,16 @@ function columnRow(a) {
 }
 
 function archiveCard(a) {
+  // タグはカード全体のリンクの外に置きます。
+  // リンクの中にリンクを入れることはできないためです。
+  const tags = (a.tags || []).length
+    ? `\n  <div class="archive-tags">`
+      + a.tags.map((t) => `<a href="/tag/${encodeURIComponent(t)}/">#${esc(t)}</a>`).join('')
+      + `</div>` : '';
   return `<article class="archive-card"><a href="/${esc(a.slug)}/">
   <img src="${esc(cardImage(a))}" alt="" loading="lazy">
   <div><time>${formatDate(a.date)}</time><h2>${esc(a.title)}</h2><p>${esc(a.description)}</p></div>
-</a></article>`;
+</a>${tags}</article>`;
 }
 
 function headTags(o) {
@@ -205,8 +211,9 @@ function headTags(o) {
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(desc)}">`,
     `<link rel="canonical" href="${esc(canonical)}">`,
-    o.noindex ? '<meta name="robots" content="noindex, nofollow">'
-              : '<meta name="robots" content="index, follow, max-image-preview:large">',
+    o.robots ? `<meta name="robots" content="${esc(o.robots)}">`
+      : (o.noindex ? '<meta name="robots" content="noindex, nofollow">'
+                   : '<meta name="robots" content="index, follow, max-image-preview:large">'),
     `<meta property="og:locale" content="ja_JP">`,
     `<meta property="og:type" content="${o.type || 'website'}">`,
     `<meta property="og:title" content="${esc(title)}">`,
@@ -371,6 +378,25 @@ function buildAssets() {
         '.search-cats a:hover{box-shadow:var(--shadow)}',
         '@media(max-width:600px){.archive-header .search-page-form{height:42px}',
         '.search-page-form button{width:76px}.search-note{padding:18px 16px}}',
+      ].join(''),
+      // 一覧カードのタグ（カテゴリ一覧・タグ一覧）
+      [
+        '.archive-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:-6px;padding:0 18px 16px}',
+        '.archive-tags a{padding:4px 10px;border:1px solid #eadfd9;border-radius:999px;',
+        'background:#fffdfa;color:#a3968f;font-size:10px;text-decoration:none;',
+        'transition:color .15s ease,border-color .15s ease}',
+        '.archive-tags a:hover{color:var(--pink-dark);border-color:#eec9cd}',
+        '@media(max-width:600px){.archive-tags{padding:0 14px 14px}}',
+      ].join(''),
+      // 記事に付いているタグ
+      [
+        '.entry-tags{display:flex;flex-wrap:wrap;gap:9px;margin:34px 0 0}',
+        '.entry-tags a{padding:7px 14px;border:1px solid #eadfd9;border-radius:999px;',
+        'background:#fff;color:var(--text);font-size:12px;text-decoration:none;',
+        'transition:box-shadow .2s ease,color .15s ease}',
+        '.entry-tags a:hover{color:var(--pink-dark);box-shadow:var(--shadow)}',
+        '@media(max-width:600px){.entry-tags{gap:7px;margin-top:26px}',
+        '.entry-tags a{padding:6px 12px;font-size:11px}}',
       ].join(''),
       // 記事末の「同じカテゴリの記事」
       [
@@ -605,6 +631,15 @@ function makeLinkResolver(ctx) {
   };
 }
 
+// 記事に付いているタグ。押すとそのタグの一覧ページへ行きます
+function tagList(a) {
+  const tags = a.tags || [];
+  if (!tags.length) return '';
+  return '        <nav class="entry-tags" aria-label="この記事のタグ">'
+    + tags.map((t) => `<a href="/tag/${encodeURIComponent(t)}/">#${esc(t)}</a>`).join('')
+    + '</nav>';
+}
+
 // 記事の下に出す「同じカテゴリの記事」。新しい順に最大3件、自分自身は除く
 function relatedPosts(a, ctx) {
   const list = (ctx.published || [])
@@ -657,6 +692,7 @@ function buildSingle(a, prev, next, ctx) {
     DATE: formatDate(a.date), DATEISO: esc(a.date),
     HERO: hero, TOC: '', BODY: body,
     PREV: link(prev, 'previous', 'prev'), NEXT: link(next, 'next', 'next'),
+    TAGLIST: tagList(a),
     RELATED: relatedPosts(a, ctx),
   });
 
@@ -708,7 +744,14 @@ function buildPage(p, ctx) {
   }));
 }
 
-function buildArchive(slugPath, heading, list, ctx) {
+// 一覧ページ（カテゴリ・タグ）を書き出します。
+//   dir   … 書き出す場所。タグは日本語のフォルダ名になります
+//   url   … ページのURL。日本語は %E3%81… の形に直したものを渡します
+//   title … <title> に使う文言（省略時は heading）
+function buildArchive(o, ctx) {
+  const dir = o.dir;
+  const url = o.url || dir;
+  const list = o.list || [];
   const per = config.archivePerPage;
   const pages = Math.max(1, Math.ceil(list.length / per));
   for (let i = 0; i < pages; i++) {
@@ -719,20 +762,42 @@ function buildArchive(slugPath, heading, list, ctx) {
     if (pages > 1) {
       const links = [];
       for (let n = 1; n <= pages; n++) {
-        const href = n === 1 ? slugPath : `${slugPath}page/${n}/`;
+        const href = n === 1 ? url : `${url}page/${n}/`;
         links.push(n === i + 1
           ? `<span class="page-numbers current">${n}</span>`
           : `<a class="page-numbers" href="${href}">${n}</a>`);
       }
       pagination = `<nav class="navigation pagination"><div class="nav-links">${links.join('')}</div></nav>`;
     }
-    const content = fill(readTpl('archive.html'), { HEADING: esc(heading), CARDS: cards, PAGINATION: pagination });
-    const out = i === 0 ? `${slugPath}index.html` : `${slugPath}page/${i + 1}/index.html`;
+    const content = fill(readTpl('archive.html'), { HEADING: esc(o.heading), CARDS: cards, PAGINATION: pagination });
+    const out = i === 0 ? `${dir}index.html` : `${dir}page/${i + 1}/index.html`;
     write(out.replace(/^\//, ''), layout({
-      path: i === 0 ? slugPath : `${slugPath}page/${i + 1}/`,
-      title: heading, bodyClass: 'archive', content, ...ctx,
+      path: i === 0 ? url : `${url}page/${i + 1}/`,
+      title: o.title || o.heading,
+      // 検索結果には出さないが、ここから記事へはたどってほしいので follow のまま
+      robots: o.noindex ? 'noindex, follow' : '',
+      bodyClass: 'archive', content, ...ctx,
     }));
   }
+}
+
+// 公開記事に付いているタグを、使われている数の多い順に集めます
+function tagIndex(published) {
+  const byTag = {};
+  published.forEach((a) => (a.tags || []).forEach((t) => {
+    if (!byTag[t]) byTag[t] = [];
+    byTag[t].push(a);
+  }));
+  return Object.keys(byTag)
+    .sort((a, b) => byTag[b].length - byTag[a].length || a.localeCompare(b, 'ja'))
+    .map((name) => ({
+      name,
+      list: byTag[name],
+      dir: `/tag/${name}/`,
+      url: `/tag/${encodeURIComponent(name)}/`,
+      // 記事が1本しかないタグは中身が薄いので、検索結果には出しません
+      indexable: byTag[name].length >= (config.tagIndexMin || 1),
+    }));
 }
 
 function buildFrontPage(published, ctx) {
@@ -780,7 +845,8 @@ function buildExtras(published, ctx, extra) {
   // sitemap.xml
   const urls = ['/'].concat(published.map((a) => `/${a.slug}/`))
     .concat((extra && extra.pages || []).map((p) => `/${p.slug}/`))
-    .concat(config.categories.map((c) => `/category/${c.slug}/`));
+    .concat(config.categories.map((c) => `/category/${c.slug}/`))
+    .concat(((extra && extra.tags) || []).filter((t) => t.indexable).map((t) => t.url));
   write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     + urls.map((u) => `  <url><loc>${config.url}${u}</loc></url>`).join('\n')
@@ -825,7 +891,7 @@ function buildExtras(published, ctx, extra) {
   // 検索用のインデックス
   write('search-index.json', JSON.stringify(published.map((a) => ({
     t: a.title, u: `/${a.slug}/`, c: categoryOf(a.category).name, d: a.description,
-    g: cardImage(a), dt: formatDate(a.date), iso: a.date,
+    g: cardImage(a), dt: formatDate(a.date), iso: a.date, tg: a.tags || [],
   }))));
 }
 
@@ -873,20 +939,36 @@ function build(opts) {
   drafts.forEach((a) => buildSingle(a, null, null, Object.assign({}, ctx, { draft: true })));
 
   config.categories.forEach((c) => {
-    buildArchive(`/category/${c.slug}/`, c.name, published.filter((a) => a.category === c.slug), ctx);
+    buildArchive({
+      dir: `/category/${c.slug}/`,
+      heading: c.name,
+      list: published.filter((a) => a.category === c.slug),
+    }, ctx);
+  });
+
+  // タグごとの一覧。記事に付いているタグをすべて拾います
+  const tags = tagIndex(published);
+  ctx.tags = tags;
+  tags.forEach((t) => {
+    buildArchive({
+      dir: t.dir, url: t.url,
+      heading: `#${t.name}`, title: `${t.name}の記事`,
+      list: t.list, noindex: !t.indexable,
+    }, ctx);
   });
 
   const pages = loadMarkdownDir(PAGES, 'page');
   pages.forEach((p) => buildPage(p, ctx));
 
   buildFrontPage(published, ctx);
-  buildExtras(published, ctx, { pages });
+  buildExtras(published, ctx, { pages, tags });
 
   return {
     ms: Date.now() - started,
     articles: published.length,
     drafts: drafts.length,
     pages: pages.length,
+    tags: tags.length,
     imagesBefore: assets.imagesBefore,
     imagesAfter: assets.imagesAfter,
   };

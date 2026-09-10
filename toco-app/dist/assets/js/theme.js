@@ -214,7 +214,7 @@
       // 空白区切りのことばは、すべて含む記事だけを出します
       var terms = normalize(q).split(/\s+/).filter(Boolean);
       var hits = items.filter(function (a) {
-        var hay = normalize([a.t, a.d, a.c].join(' '));
+        var hay = normalize([a.t, a.d, a.c, (a.tg || []).join(' ')].join(' '));
         return terms.every(function (t) { return hay.indexOf(t) !== -1; });
       });
 
@@ -259,8 +259,20 @@
       body.appendChild(desc);
     }
     link.appendChild(body);
-
     card.appendChild(link);
+
+    // タグはリンクの外に置きます（リンクの中にリンクは入れられないため）
+    if (a.tg && a.tg.length) {
+      var tags = document.createElement('div');
+      tags.className = 'archive-tags';
+      a.tg.forEach(function (name) {
+        var tag = document.createElement('a');
+        tag.href = '/tag/' + encodeURIComponent(name) + '/';
+        tag.textContent = '#' + name;
+        tags.appendChild(tag);
+      });
+      card.appendChild(tags);
+    }
     return card;
   }
 
