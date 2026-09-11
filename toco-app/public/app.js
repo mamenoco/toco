@@ -2834,9 +2834,28 @@ function renderColumnPicked() {
   const over = picked.length > 4;
   $('#colPickedNote').innerHTML = `${picked.length}点`
     + (over ? ' <span style="color:var(--err)">コラムは2〜4点までにしてください。多いと商品紹介の記事と競います</span>' : '');
+  // 選んだものを、ここから外せるようにします。
+  // 上の一覧は絞り込むと見えなくなるので、ここでも外せないと戻れません。
+  // 送り先の記事が非公開になった商品も、選んだまま残らないよう一緒に出します。
+  const gone = COL_PICKED.filter((id) => !COL_PRODUCTS.some((x) => x.id === id));
   $('#colPicked').innerHTML = picked.map((x) => `
-    <div class="item"><div style="flex:1"><div class="t">${esc(x.name)}</div>
-      <div class="note">{{product:${esc(x.id)}}} ／ 送り先 {{link:${esc(x.articles[0].slug)}|…}}</div></div></div>`).join('');
+    <div class="item"><div style="flex:1;min-width:0"><div class="t">${esc(x.name)}</div>
+      <div class="note">{{product:${esc(x.id)}}} ／ 送り先 {{link:${esc(x.articles[0].slug)}|…}}</div></div>
+      <button class="ghost danger" data-col-remove="${esc(x.id)}" style="padding:4px 12px;font-size:12px">外す</button></div>`)
+    .concat(gone.map((id) => `
+    <div class="item"><div style="flex:1;min-width:0"><div class="t">${esc(id)}</div>
+      <div class="note" style="color:var(--err)">送り先の記事が見つかりません（非公開になった可能性があります）</div></div>
+      <button class="ghost danger" data-col-remove="${esc(id)}" style="padding:4px 12px;font-size:12px">外す</button></div>`))
+    .join('');
+
+  $('#colPicked').querySelectorAll('[data-col-remove]').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.colRemove;
+      COL_PICKED = COL_PICKED.filter((x) => x !== id);
+      await saveColumnPicks();
+      renderColumnProducts();          // 上の一覧のチェックも外します
+      toast('商品を外しました');
+    }));
 }
 
 async function saveColumnPicks() {
