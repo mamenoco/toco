@@ -1,7 +1,7 @@
 ---
 title: うさぎの消臭剤のおすすめ7選｜舐めても安全な成分の選び方や掃除のコツまで詳しく紹介
 slug: rabbit-deodorant
-category: toy
+category: life
 tags: [消臭剤, 尿石汚れ, 掃除, 選び方]
 date: 2026-09-11
 updated: 2026-09-11
