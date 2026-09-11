@@ -405,7 +405,7 @@ async function openProject(id, wantStep, keepHash) {
     '#fetchAllNote',    // 「口コミを○件取得しました」
     '#masterNote',      // 商品マスタへの登録結果
     '#aiStatus', '#aiPhase', '#aiCount', '#aiDiffNote',
-    '#copyNote', '#markNote', '#bodyImgNote', '#metaSaved', '#eyeGenNote', '#eyeSaved',
+    '#copyNote', '#markNote', '#bodyImgNote', '#metaSaved', '#eyeSaved',
   ].forEach((sel) => {
     const el = $(sel); if (el) el.textContent = '';
   });
@@ -1662,9 +1662,7 @@ function fillMetaForm() {
   updateUrlPreview();
   renderPubReady();
   renderEyecatch();
-  initEyeGen();
   renderEyeHistory();
-  renderEyeRefs();
 }
 
 function updateUrlPreview() {
@@ -1778,15 +1776,8 @@ function renderEyecatch() {
   };
 }
 
-// ---- AIでアイキャッチを作る ----
-// ひな形。日本語のまま送れます（英語には自動で直されます）。
-const EYE_TEMPLATES = {
-  items: '明るい木のテーブルに、陶器の食器と編みかご、乾燥した牧草をきれいに並べたところ',
-  hay: '木の床に置かれた白い陶器のボウルに入った乾燥牧草と、そばに置かれた小さなかご',
-  room: '朝の光が入る明るいリビングの一角。木の床に小さなペット用ケージ、レースのカーテン。動物は写っていない',
-};
-
-// これまでに作った画像。差し替えても戻せます。
+// ---- アイキャッチの候補 ----
+// これまでに使ったアイキャッチ。差し替えても戻せます。
 async function renderEyeHistory() {
   if (!CURRENT) return;
   let r;
@@ -1797,7 +1788,7 @@ async function renderEyeHistory() {
   if (!items.length) { box.innerHTML = ''; return; }
 
   box.innerHTML = `<h3 style="margin:0 0 4px">これまでの候補 <span class="tag">${items.length}枚</span></h3>
-    <p class="note">押すとアイキャッチが差し替わります。作り直しても前のものは残ります。</p>
+    <p class="note">押すとアイキャッチが差し替わります。新しくアップロードしても、前のものは残ります。</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
       ${items.map((x, i) => `<div>
         <img src="${esc(x.url)}" alt="" data-use="${i}"
@@ -1825,101 +1816,6 @@ async function renderEyeHistory() {
     renderEyeHistory();
   }));
 }
-
-// 参照する商品（この記事に載せている商品のうち、画像があるもの）
-let EYE_REF = '';
-
-async function renderEyeRefs() {
-  const box = $('#eyeRefBox');
-  if (!box || !CURRENT.id) return;
-  let r;
-  try { r = await api('eyecatch/references?id=' + encodeURIComponent(CURRENT.id)); } catch (e) { return; }
-  const items = r.items || [];
-  if (!items.length) {
-    EYE_REF = '';
-    box.innerHTML = '<p class="note">商品を登録すると、その商品の写真をもとにした絵も作れます。</p>';
-    return;
-  }
-  if (EYE_REF && !items.some((x) => x.id === EYE_REF)) EYE_REF = '';
-
-  box.innerHTML = `
-    <p class="note" style="margin:0 0 6px"><b>実際の商品をもとに作る</b>（任意）。
-      選んだ商品の形をそのまま残して、置かれている場面だけを作り替えます。
-      ケージやトイレのように「その商品が主役」の絵に向いています。</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${items.map((x) => `
-        <button class="ghost" data-ref="${esc(x.id)}" title="${esc(x.name)}"
-          style="padding:4px;width:86px;border-width:${EYE_REF === x.id ? '2px' : '1px'};
-            border-color:${EYE_REF === x.id ? 'var(--accent)' : 'var(--line)'}">
-          <img src="${esc(x.image)}" style="width:100%;height:56px;object-fit:contain;display:block">
-          <span style="font-size:10px;line-height:1.3;display:block;margin-top:3px;
-            overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span>
-        </button>`).join('')}
-      <button class="ghost" data-ref="" style="padding:4px 12px;font-size:12px;
-        border-width:${EYE_REF ? '1px' : '2px'};border-color:${EYE_REF ? 'var(--line)' : 'var(--accent)'}">
-        参照しない</button>
-    </div>
-    <p class="note" id="eyeRefNote" style="margin:6px 0 0"></p>`;
-
-  box.querySelectorAll('[data-ref]').forEach((b) => b.addEventListener('click', () => {
-    EYE_REF = b.dataset.ref;
-    renderEyeRefs();
-  }));
-
-  const note = $('#eyeRefNote');
-  if (note) {
-    note.innerHTML = EYE_REF
-      ? '参照するときは専用のモデル（FLUX Pro Kontext）に切り替わります。'
-        + '仕上がりは良いぶん、1枚あたりの費用は上のモデルより高めです。'
-      : '';
-  }
-  const wrap = $('#eyeModelWrap');
-  if (wrap) wrap.style.opacity = EYE_REF ? '0.45' : '';
-}
-
-async function initEyeGen() {
-  let r;
-  try { r = await api('eyecatch/models'); } catch (e) { return; }
-  $('#eyeModel').innerHTML = r.models.map((m) =>
-    `<option value="${esc(m.id)}" title="${esc(m.note)}">${esc(m.label)}</option>`).join('');
-  if (!r.hasKey) {
-    $('#eyeGenNote').innerHTML = '<span style="color:var(--err)">fal.ai のAPIキーが未設定です。'
-      + '設定画面で登録すると使えます。</span>';
-    $('#btnEyeGen').disabled = true;
-  } else {
-    $('#eyeGenNote').textContent = '';
-    $('#btnEyeGen').disabled = false;
-  }
-}
-
-$$('[data-tpl]').forEach((b) => b.addEventListener('click', () => {
-  $('#eyePrompt').value = EYE_TEMPLATES[b.dataset.tpl] || '';
-  $('#eyePrompt').focus();
-}));
-
-$('#btnEyeGen').addEventListener('click', async () => {
-  const prompt = $('#eyePrompt').value.trim();
-  if (!prompt) return toast('どんな絵にするかを書いてください');
-  if (!CURRENT.slug) return toast('先にURLを決めて保存してください');
-  if (CURMETA.eyecatch && !confirm('いまのアイキャッチを置き換えます。よろしいですか？')) return;
-
-  $('#btnEyeGen').disabled = true;
-  $('#eyeGenNote').innerHTML = '<span class="spin"></span>英語に直してから作っています（20〜50秒ほど）…';
-  try {
-    const r = await api('eyecatch/generate', {
-      id: CURRENT.id, prompt, model: $('#eyeModel').value,
-      noAnimals: $('#eyeNoAnimals').checked,
-      productId: EYE_REF || '',
-    });
-    CURMETA.eyecatch = r.path;
-    renderEyecatch(); renderPubReady(); renderEyeHistory();
-    $('#eyeGenNote').innerHTML = `できました（${r.kb}KB・1200×630${r.usedReference ? '・商品を参照' : ''}）。気に入らなければ、もう一度作れます。`
-      + (r.promptJa ? `<br><span style="color:var(--mute)">送った英語：${esc(r.promptEn)}</span>` : '');
-    toast('アイキャッチを作りました');
-  } catch (e) {
-    $('#eyeGenNote').textContent = '';
-  } finally { $('#btnEyeGen').disabled = false; }
-});
 
 $('#eyeFile').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];

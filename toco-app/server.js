@@ -58,8 +58,6 @@ const pages = require('./lib/pages.js');
 const ideaAI = require('./lib/idea-ai.js');
 const kind = require('./lib/kind.js');
 const similarity = require('./lib/similarity.js');
-const imageAI = require('./lib/image-ai.js');
-const translate = require('./lib/translate.js');
 const meta = require('./lib/meta.js');
 const preview = require('./lib/preview-server.js');
 const fal = require('./lib/fal.js');
@@ -1034,56 +1032,6 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { html, toc: '', headings: r.headings });
     }
 
-    // ===== アイキャッチを生成する（fal.ai） =====
-    if (p === '/api/eyecatch/generate') {
-      const pr = db.projects.find((x) => x.id === body.id);
-      if (!pr || !pr.slug) return send(res, 200, { error: '先にURL（スラッグ）を決めてください' });
-      // 日本語で書かれていたら、画像生成向けの英語に直してから送ります。
-      // 翻訳は Claude Code に頼むので、追加の鍵や費用はかかりません。
-      const t = await translate.toEnglish(body.prompt, settings.aiModel);
-
-      // 商品を参照するとき、その商品画像を読み込みます
-      let referenceDataUri = '';
-      if (body.productId) {
-        const prod = products.get(body.productId);
-        const img = prod && prod.image
-          ? path.join(ROOT, 'site', String(prod.image).replace(/^\//, '')) : '';
-        if (!img || !fs.existsSync(img)) {
-          return send(res, 200, { error: 'その商品の画像が見つかりませんでした。商品画面で画像を設定してください。' });
-        }
-        referenceDataUri = imageAI.toDataUri(img);
-      }
-
-      const r = await imageAI.generate(settings.falKey, {
-        prompt: t.english,
-        model: body.model,
-        style: settings.imageStyle || imageAI.DEFAULT_STYLE,
-        noAnimals: body.noAnimals !== false,
-        referenceDataUri,
-      });
-      // 候補として履歴に残してから、いまのアイキャッチにします。
-      // 履歴は _history に置きます。公開されるサイトには含まれません。
-      const hist = path.join(ROOT, 'site', 'assets', 'eyecatch', '_history', pr.slug);
-      const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-      imageAI.saveAs(r.buffer, path.join(hist, `${stamp}.jpg`));
-      fs.writeFileSync(path.join(hist, `${stamp}.txt`),
-        `${String(body.prompt || '').trim()}\n${t.english}\n`, 'utf8');
-
-      const file = path.join(ROOT, 'site', 'assets', 'eyecatch', `${pr.slug}.jpg`);
-      // 同じ名前のpngが残っていると、どちらが使われるか分からなくなるので消します
-      const png = file.replace(/\.jpg$/, '.png');
-      if (fs.existsSync(png)) fs.unlinkSync(png);
-      const size = imageAI.saveAs(r.buffer, file);
-      const rel = `/assets/eyecatch/${pr.slug}.jpg`;
-      writeArticle(pr, null, { eyecatch: rel });
-      return send(res, 200, {
-        ok: true, path: rel, kb: Math.round(size / 1024),
-        promptJa: t.translated ? String(body.prompt).trim() : '',
-        promptEn: t.english,
-        usedReference: !!r.usedReference,
-      });
-    }
-
     // これまでに作った画像の一覧
     if (p === '/api/eyecatch/history') {
       const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
@@ -1152,43 +1100,6 @@ const server = http.createServer(async (req, res) => {
     // こうしておくと、送り先の記事が必ず存在します。
     if (p === '/api/products/published') {
       return send(res, 200, { items: products.usedInArticles() });
-    }
-
-    if (p === '/api/eyecatch/references') {
-      const pr = db.projects.find((x) => x.id === u.searchParams.get('id'));
-      if (!pr) return send(res, 200, { items: [] });
-      const master = products.load();
-      const ids = new Set();
-
-      // 本文に置いた {{product:…}} がいちばん確かな手がかりです
-      const md = bodyOf(pr) || '';
-      let m;
-      const re = /\{\{product:([^}]+)\}\}/g;
-      while ((m = re.exec(md))) ids.add(m[1].trim());
-
-      // 本文がまだ無いときは、選んだ商品から探します
-      (pr.products || []).forEach((x) => {
-        const hit = master.find((y) =>
-          (x.masterId && y.id === x.masterId)
-          || (x.code && y.rakuten && y.rakuten.itemCode === x.code));
-        if (hit) ids.add(hit.id);
-      });
-
-      const items = [...ids]
-        .map((id) => master.find((y) => y.id === id))
-        .filter((y) => y && y.image
-          && fs.existsSync(path.join(ROOT, 'site', String(y.image).replace(/^\//, ''))))
-        .map((y) => ({ id: y.id, name: y.name, image: y.image }));
-      return send(res, 200, { items });
-    }
-
-    if (p === '/api/eyecatch/models') {
-      return send(res, 200, {
-        models: imageAI.MODELS,
-        hasKey: !!settings.falKey,
-        style: settings.imageStyle || imageAI.DEFAULT_STYLE,
-        defaultStyle: imageAI.DEFAULT_STYLE,
-      });
     }
 
     // ===== 本文に入れる画像 =====
