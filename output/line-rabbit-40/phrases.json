@@ -1,0 +1,202 @@
+[
+  {
+    "id": "01",
+    "phrase": "了解",
+    "pose": "Crisp friendly salute, one paw at forehead, confident small smile, sitting upright."
+  },
+  {
+    "id": "02",
+    "phrase": "OK",
+    "pose": "Both forepaws raised above head forming a large rounded arch to express approval, cheerful closed smiling eyes."
+  },
+  {
+    "id": "03",
+    "phrase": "はーい",
+    "pose": "One forepaw raised straight up eagerly, bright attentive face, seated."
+  },
+  {
+    "id": "04",
+    "phrase": "いいね",
+    "pose": "One paw extended toward viewer in a simplified thumbs-up gesture, warm smile."
+  },
+  {
+    "id": "05",
+    "phrase": "うんうん",
+    "pose": "Gentle nodding head, eyes happily closed, forepaws on lap, two small curved motion strokes."
+  },
+  {
+    "id": "06",
+    "phrase": "大丈夫だよ",
+    "pose": "Calm reassuring smile, one paw on own chest and the other open reassuringly toward viewer."
+  },
+  {
+    "id": "07",
+    "phrase": "まかせて",
+    "pose": "Proud upright pose, one paw tapping chest, determined eyes, tiny sparkle."
+  },
+  {
+    "id": "08",
+    "phrase": "わかった",
+    "pose": "A small thoughtful nod, one paw touching chin then lifted slightly, attentive eyes."
+  },
+  {
+    "id": "09",
+    "phrase": "ありがとう",
+    "pose": "Gentle shallow bow with both forepaws together at chest, grateful smiling eyes."
+  },
+  {
+    "id": "10",
+    "phrase": "ありがとうございます",
+    "pose": "Deep respectful forward bow, forepaws together on ground, ears visible above rounded bowed head."
+  },
+  {
+    "id": "11",
+    "phrase": "よろしくお願いします",
+    "pose": "Polite upright seated pose, forepaws neatly together in front, slight head tilt, friendly modest smile."
+  },
+  {
+    "id": "12",
+    "phrase": "お願い",
+    "pose": "Forepaws clasped under chin, hopeful upturned eyes, small imploring forward lean."
+  },
+  {
+    "id": "13",
+    "phrase": "ごめんね",
+    "pose": "Apologetic downward head tilt, forepaws clasped, worried brows, one tiny blue sweat bead."
+  },
+  {
+    "id": "14",
+    "phrase": "すみません",
+    "pose": "Bowing slightly while timidly raising one paw near face, embarrassed apologetic expression."
+  },
+  {
+    "id": "15",
+    "phrase": "お疲れさま",
+    "pose": "Warm caring smile while offering a small plain cream-colored steaming tea cup in both paws."
+  },
+  {
+    "id": "16",
+    "phrase": "おはよう",
+    "pose": "Happy morning stretch with both paws out wide and sleepy smiling eyes, tiny sun pictogram beside head."
+  },
+  {
+    "id": "17",
+    "phrase": "こんにちは",
+    "pose": "Friendly front-facing greeting, one paw waving at shoulder height, open dot eyes."
+  },
+  {
+    "id": "18",
+    "phrase": "こんばんは",
+    "pose": "Quiet gentle greeting with both paws resting in front and slight bow, small crescent moon beside head."
+  },
+  {
+    "id": "19",
+    "phrase": "おやすみ",
+    "pose": "Curled asleep in compact loaf pose, closed eyes, head resting on forepaws; no Z marks or text."
+  },
+  {
+    "id": "20",
+    "phrase": "またね",
+    "pose": "Three-quarter rear view, head turned back toward viewer, one paw waving goodbye, small round tail visible."
+  },
+  {
+    "id": "21",
+    "phrase": "行ってきます",
+    "pose": "Stepping cheerfully toward right, small plain shoulder bag, turning head back with a smile."
+  },
+  {
+    "id": "22",
+    "phrase": "おかえり",
+    "pose": "Arms spread welcomingly toward viewer, joyful smile, seated open posture."
+  },
+  {
+    "id": "23",
+    "phrase": "ただいま",
+    "pose": "Poking head and upper body playfully around a simple narrow door edge, happy relieved smile, one paw waving."
+  },
+  {
+    "id": "24",
+    "phrase": "気をつけてね",
+    "pose": "Leaning forward with caring worried brows and both paws extended gently, a tiny soft heart."
+  },
+  {
+    "id": "25",
+    "phrase": "おめでとう",
+    "pose": "Joyful bunny holding small party popper, few simple muted confetti shapes, happy closed eyes."
+  },
+  {
+    "id": "26",
+    "phrase": "やったー",
+    "pose": "Jumping with both paws high in a V, feet off ground, delighted face, two small celebratory rays."
+  },
+  {
+    "id": "27",
+    "phrase": "うれしい",
+    "pose": "Forepaws pressed to cheeks, bashful delighted closed eyes, tiny pink blush."
+  },
+  {
+    "id": "28",
+    "phrase": "楽しみ",
+    "pose": "Excited seated bunny leaning forward with paws tucked under chin, bright eyes, two tiny sparkles."
+  },
+  {
+    "id": "29",
+    "phrase": "大好き",
+    "pose": "Hugging one soft dusty-pink heart tightly against chest, affectionate closed eyes."
+  },
+  {
+    "id": "30",
+    "phrase": "すごい",
+    "pose": "Clapping both forepaws in front, impressed round eyes, small open mouth, two tiny sparkle shapes."
+  },
+  {
+    "id": "31",
+    "phrase": "がんばって",
+    "pose": "Cheering with both tiny fists at shoulder height, energetic supportive face, no props."
+  },
+  {
+    "id": "32",
+    "phrase": "がんばる",
+    "pose": "Determined bunny leaning forward in ready stance, forepaws balled at sides, focused brows."
+  },
+  {
+    "id": "33",
+    "phrase": "お大事に",
+    "pose": "Tender caring bunny holding out one small folded cream blanket with a tiny heart above it."
+  },
+  {
+    "id": "34",
+    "phrase": "無理しないでね",
+    "pose": "Calm concerned bunny making a gentle slow-down gesture with both open paws low in front, head tilted kindly."
+  },
+  {
+    "id": "35",
+    "phrase": "ちょっと待って",
+    "pose": "One paw extended palm outward to pause, other paw tucked to chest, slightly hurried expression."
+  },
+  {
+    "id": "36",
+    "phrase": "今向かってる",
+    "pose": "Running briskly toward right in side view, ears short upright, feet in motion, two small speed strokes."
+  },
+  {
+    "id": "37",
+    "phrase": "待ってるね",
+    "pose": "Patiently sitting with paws on knees beside a tiny simple blank-face clock with only hands, no numerals or tick marks."
+  },
+  {
+    "id": "38",
+    "phrase": "笑",
+    "pose": "Laughing with eyes squeezed into happy curves, one paw over mouth and other holding belly, body tilted."
+  },
+  {
+    "id": "39",
+    "phrase": "えっ！？",
+    "pose": "Surprised bunny leaning backward, wide round eyes and tiny open mouth, paws lifted beside face. No punctuation glyphs."
+  },
+  {
+    "id": "40",
+    "phrase": "しょんぼり",
+    "pose": "Sad bunny seated hunched with head drooping, forepaws limp between feet, downcast eyes and one small tear."
+  }
+]
