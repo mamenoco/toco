@@ -192,11 +192,6 @@
     title.textContent = a.t;
     body.appendChild(time);
     body.appendChild(title);
-    if (a.d) {
-      var desc = document.createElement('p');
-      desc.textContent = a.d;
-      body.appendChild(desc);
-    }
     link.appendChild(body);
     card.appendChild(link);
 

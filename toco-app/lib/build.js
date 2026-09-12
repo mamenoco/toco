@@ -198,7 +198,7 @@ function archiveCard(a, withTags) {
       + `</div>` : '';
   return `<article class="archive-card"><a href="/${esc(a.slug)}/">
   <img src="${esc(cardImage(a))}" alt="" loading="lazy">
-  <div><time>${formatDate(a.date)}</time><h2>${esc(a.title)}</h2><p>${esc(a.description)}</p></div>
+  <div><time>${formatDate(a.date)}</time><h2>${esc(a.title)}</h2></div>
 </a>${tags}</article>`;
 }
 
@@ -378,6 +378,16 @@ function buildAssets() {
         '.search-cats a:hover{box-shadow:var(--shadow)}',
         '@media(max-width:600px){.archive-header .search-page-form{height:42px}',
         '.search-page-form button{width:76px}.search-note{padding:18px 16px}}',
+      ].join(''),
+      // 一覧のカード。スマホでは2枚ずつ横に並べます
+      [
+        '@media(max-width:600px){',
+        '.archive-grid{grid-template-columns:1fr 1fr;gap:12px}',
+        '.archive-card div{padding:12px}',
+        '.archive-card h2{font-size:13px;line-height:1.55}',
+        '.archive-card time{font-size:9px}',
+        '.archive-tags{margin-top:-4px;padding:0 12px 12px;gap:5px}',
+        '.archive-tags a{padding:3px 8px;font-size:9px}}',
       ].join(''),
       // 一覧ページの見出しの下に出すキーワード
       [
