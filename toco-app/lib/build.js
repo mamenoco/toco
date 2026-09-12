@@ -840,8 +840,8 @@ function buildFrontPage(published, ctx) {
 </a>`).join('\n');
 
   const pickup = published.slice(0, 15);
-  let columns = published.filter((a) => a.category === 'column').slice(0, 3);
-  if (!columns.length) columns = pickup.slice(0, 3);
+  let columns = published.filter((a) => a.category === 'column').slice(0, 5);
+  if (!columns.length) columns = pickup.slice(0, 5);
 
   const counts = {};
   published.forEach((a) => a.tags.forEach((t) => { counts[t] = (counts[t] || 0) + 1; }));
