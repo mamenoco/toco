@@ -12,8 +12,16 @@ let CURMETA = {};     // その記事のフロントマター
 // ---------- 通信 ----------
 async function api(path, body) {
   const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {};
-  const res = await fetch('/api/' + path, opt);
-  const json = await res.json();
+  let json;
+  try {
+    const res = await fetch('/api/' + path, opt);
+    json = await res.json();
+  } catch (e) {
+    // アプリ（サーバー）が止まっていたり、途中で再起動したりすると、ここに来ます
+    const msg = 'アプリとの通信が途切れました。アプリが起動しているか確かめて、もう一度お試しください。';
+    toast(msg);
+    throw new Error(msg);
+  }
   if (json.error) { toast(json.error); throw new Error(json.error); }
   return json;
 }
@@ -2674,7 +2682,14 @@ $('#btnIaClose').addEventListener('click', () => {
 $('#btnIaRun').addEventListener('click', async () => {
   $('#btnIaRun').disabled = true;
   $('#iaResult').innerHTML = '';
-  $('#iaNote').innerHTML = '<span class="spin"></span>いまある記事を読んで考えています（30秒〜2分ほど）…';
+  // 1分前後かかるので、止まっていないことが分かるよう経過時間を出します
+  const t0 = Date.now();
+  const tick = () => {
+    $('#iaNote').innerHTML = '<span class="spin"></span>いまある記事を読んで考えています（30秒〜2分ほど）… '
+      + `<span style="color:var(--mute)">${Math.round((Date.now() - t0) / 1000)}秒</span>`;
+  };
+  tick();
+  const timer = setInterval(tick, 1000);
   try {
     const r = await api('ideas/suggest', {
       count: Number($('#iaCount').value) || 20,
@@ -2687,8 +2702,12 @@ $('#btnIaRun').addEventListener('click', async () => {
       : 'すべて既存と重なっていました。件数を増やすか、希望を書いてお試しください。';
     renderIaResult();
   } catch (e) {
-    $('#iaNote').textContent = '';
-  } finally { $('#btnIaRun').disabled = false; }
+    // 失敗の理由を画面に残します。下に出る案内は数秒で消えるため、
+    // 待っている間に目を離すと「何も出なかった」ようにしか見えなかったためです。
+    $('#iaNote').innerHTML = '<span style="color:var(--err)">ネタを出せませんでした：'
+      + esc(String(e.message || e)) + '</span><br>もう一度「出す」を押してください。'
+      + '続けて失敗するときは、件数を減らすか、希望の文を短くしてお試しください。';
+  } finally { clearInterval(timer); $('#btnIaRun').disabled = false; }
 });
 
 function renderIaResult() {

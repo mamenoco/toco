@@ -407,7 +407,10 @@ const server = http.createServer(async (req, res) => {
           ideas: db.ideas.map((i) => ({ title: i.title, keyword: i.keyword })),
           // 固定ページも既存の内容です。入れないと「はじめての方へ」と
           // 同じ趣旨のネタが候補に出てきます。
-          articles: artList.map((a) => ({ title: a.title, slug: a.slug }))
+          // 記事ごとに「選び方」で比べている切り口も渡します。
+          // タイトルだけだと、既存の記事の中身を切り出しただけのネタ
+          // （チモシー記事がある のに「1番刈りと2番刈りの違い」など）を見分けられないためです。
+          articles: artList.map((a) => ({ title: a.title, slug: a.slug, angles: chooseAngles(a.slug) }))
             .concat(pages.list().map((pg) => ({ title: pg.title, slug: pg.slug }))),
           pending,
           model: settings.aiModel,
@@ -1321,6 +1324,18 @@ function columnMentions(pr) {
   if (!ids.length) return [];
   const all = products.usedInArticles();
   return ids.map((id) => all.find((x) => x.id === id)).filter(Boolean);
+}
+
+// 記事の「〇〇の選び方」にある h3 見出し＝その記事ですでに比べている切り口
+function chooseAngles(slug) {
+  const body = (articles.read(slug) || {}).body || '';
+  const out = [];
+  let on = false;
+  body.split('\n').forEach((line) => {
+    if (/^##\s/.test(line)) on = /選び方/.test(line);
+    else if (on && /^###\s/.test(line)) out.push(line.replace(/^###\s+/, '').trim());
+  });
+  return out;
 }
 
 function newProject(db, src) {

@@ -39,6 +39,15 @@ function instruction(o) {
   L.push('- うさぎを飼っている人が実際に検索しそうな言葉を選びます');
   L.push('- ニッチすぎるもの、うさぎと関係が薄いものは挙げません');
   L.push('- すでにあるネタ・記事と重ならないようにします（下に一覧があります）');
+  L.push('- **すでにある記事の「選び方」で比べている切り口を、別の記事にしない。**');
+  L.push('  例：チモシーの記事が刈り取り時期で比べているなら「1番刈りと2番刈りの違い」は作らない。');
+  L.push('  トイレの記事が形で比べているなら「三角と四角どっちがいい？」は作らない。');
+  L.push('  同じ検索語で自分の記事どうしが競い、どちらも順位が下がるためです');
+  L.push('- **すでにある記事で扱っている商品の、さらに細かい種類も別の記事にしない。**');
+  L.push('  例：ドライフルーツの記事があるなら「りんごチップス」「バナナチップス」は作らない');
+  L.push('- 細分化してよいのは、**別の商品として売られていて、まだ記事がないもの**だけです。');
+  L.push('  例：「おやつのおすすめ」という商品記事がないなら、乾燥野菜・ピューレ・クッキーは');
+  L.push('  それぞれ別の商品なので、別の記事にしてよい');
   L.push('');
   L.push('## それぞれに書くもの');
   L.push('');
@@ -65,7 +74,11 @@ function instruction(o) {
   L.push('');
   L.push('## 公開ずみの記事（重複させない）');
   L.push('');
-  o.articles.forEach((a) => L.push(`- ${a.title} … /${a.slug}/`));
+  o.articles.forEach((a) => {
+    L.push(`- ${a.title} … /${a.slug}/`);
+    // この記事ですでに比べている切り口。ここと同じ切り口のネタは出さない
+    if (a.angles && a.angles.length) L.push(`  選び方で比べていること：${a.angles.join('／')}`);
+  });
   L.push('');
   if (o.hint) {
     L.push('## 今回の希望');
@@ -80,12 +93,41 @@ function instruction(o) {
   return L.join('\n');
 }
 
+// AIの出力からネタの一覧（JSONの配列）を取り出します。
+//
+// ふだんは配列だけが返ってきますが、希望欄に長い指示を書くと、
+// 「既存の[おやつ]を細分化すると…」のような前置きを付けてくることがあります。
+// 最初の [ から読むとその前置きで失敗するので、
+// ``` で囲まれた部分 → 各 [ の位置から順に、読めるところを探します。
 function parse(out) {
   const text = String(out || '');
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start < 0 || end <= start) return null;
-  try { return JSON.parse(text.slice(start, end + 1)); } catch (e) { return null; }
+  const tries = [];
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) tries.push(fence[1]);
+  // 始まりの [ と終わりの ] の組み合わせを、外側から順に試します。
+  // 後ろに「以上、[20件]です」のような文が付いていても読めるようにするためです。
+  const opens = [];
+  const closes = [];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '[') opens.push(i);
+    else if (text[i] === ']') closes.push(i);
+  }
+  closes.reverse();
+  for (const o of opens) {
+    for (const c of closes) {
+      if (c <= o) break;
+      tries.push(text.slice(o, c + 1));
+      if (tries.length > 400) break;
+    }
+    if (tries.length > 400) break;
+  }
+  for (const t of tries) {
+    try {
+      const v = JSON.parse(t.trim());
+      if (Array.isArray(v) && v.some((x) => x && typeof x === 'object' && x.title)) return v;
+    } catch (e) { /* 次の候補を試します */ }
+  }
+  return null;
 }
 
 function suggest(opts) {
@@ -127,6 +169,7 @@ function suggest(opts) {
       }
       const arr = parse(out);
       if (!Array.isArray(arr) || !arr.length) {
+        console.error('[記事ネタ] AIの出力を読み取れませんでした。先頭：\n' + String(out).slice(0, 600));
         return reject(new Error('結果を読み取れませんでした。もう一度お試しください。'));
       }
       resolve(arr.map((x) => ({
