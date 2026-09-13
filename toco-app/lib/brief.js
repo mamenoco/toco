@@ -59,6 +59,9 @@ function buildColumnBrief(project, mentions) {
   L.push('5. 実体験は、下で「体験を書いてよい」とされたものだけ');
   L.push('6. 誇大表現・保証表現を使わない。効果や結果を断定しない');
   L.push('7. 価格は本文に書かない');
+  L.push('8. 最初の段落は、このタイトルで検索した人の困りごとから書き始め、どの文も前の文を受けて続ける。'
+    + '体験の文は、その困りごとに直接つながるときだけ。「うさぎと暮らして○年になりますが」の決まり文句は使わない'
+    + '（CLAUDE.md「2-1. 導入の書き方」）');
   L.push('');
   L.push('## この記事で触れる商品');
   L.push('');
@@ -121,6 +124,9 @@ function buildBrief(project, inventory, styleGuide) {
   L.push('6. 他社商品を貶めない');
   L.push('7. 価格は本文に書かない（ポチップに任せる）');
   L.push('8. 文の長さにゆらぎを作り、同じ構成を商品ごとに繰り返さない');
+  L.push('9. 導入は、このタイトルで検索した人の困りごとから書き始め、どの文も前の文を受けて続ける。'
+    + '体験の文は、その困りごとに直接つながるときだけ。「うさぎと暮らして○年になりますが」の決まり文句は使わない'
+    + '（CLAUDE.md「2-1. 導入の書き方」）');
   L.push('');
   const owned = inventory.filter((i) =>
     (project.products || []).some((p) => p.owned && p.name && p.name.includes(i.name.slice(0, 8)))
