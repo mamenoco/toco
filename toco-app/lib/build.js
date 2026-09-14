@@ -195,18 +195,19 @@ function shelfCard(a) {
 }
 
 function shelvesHtml(published) {
-  // コラムは下に専用の枠があるので、ここには並べません
-  const shelves = config.categories.filter((c) => c.slug !== 'column').map((c) => {
+  // コラムは下に専用の枠があるので、ここには並べません。
+  // 並び順と挿絵の番号は「カテゴリから探す」のカードと同じです
+  const shelves = config.categories.filter((c) => c.slug !== 'column').map((c, i) => {
     const list = published.filter((a) => a.category === c.slug).slice(0, SHELF_SIZE);
     if (!list.length) return '';
-    return `        <div class="shelf shelf-${esc(c.slug)}">
-            <div class="shelf-head"><h2>${esc(c.name)}</h2><a href="/category/${esc(c.slug)}/">もっと見る ›</a></div>
+    return `        <div class="shelf">
+            <div class="center-heading shelf-head"><span class="category-art category-art-${i + 1} shelf-art" aria-hidden="true"></span><h2>${esc(c.name)}</h2></div>
             <div class="shelf-grid">${list.map(shelfCard).join('\n')}</div>
+            <a class="shelf-more" href="/category/${esc(c.slug)}/">もっと見る ›</a>
         </div>`;
   }).filter(Boolean);
   if (!shelves.length) return '';
-  return `    <section class="shelf-section page-width" id="shelves">
-        <div class="center-heading"><span class="heading-flora flora-left" aria-hidden="true"></span><h2>カテゴリの新着記事</h2><span class="heading-flora pickup-flora-right" aria-hidden="true"></span></div>
+  return `    <section class="shelf-section page-width" id="shelves" aria-label="カテゴリごとの新着記事">
 ${shelves.join('\n')}
     </section>`;
 }
@@ -359,19 +360,13 @@ function buildAssets() {
         '.pickup-card h3{margin:13px 0 6px}}',
       ].join(''),
       // トップの「カテゴリの新着記事」
+      // 見出しは「ピックアップ記事」と同じ作り（center-heading）を使い、
+      // 花の代わりに「カテゴリから探す」の挿絵を小さくして頭に置きます
       [
         '.shelf-section{padding:52px 0 8px}',
-        '.shelf+.shelf{margin-top:42px}',
-        '.shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;',
-        'margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}',
-        '.shelf-head h2{display:flex;align-items:center;gap:10px;margin:0;',
-        'font-family:"Zen Maru Gothic",sans-serif;font-size:19px;letter-spacing:.06em}',
-        // カテゴリ札と同じ色の印を見出しの頭に
-        '.shelf-head h2::before{content:"";width:6px;height:22px;border-radius:3px;background:var(--shelf,var(--pink))}',
-        '.shelf-food{--shelf:#e88a9b}.shelf-house{--shelf:#e6c276}.shelf-toy{--shelf:#a6c979}',
-        '.shelf-care{--shelf:#be98d3}.shelf-life{--shelf:#f2ad8e}',
-        '.shelf-head a{flex:0 0 auto;color:var(--pink-dark);font-size:12px;text-decoration:none}',
-        '.shelf-head a:hover{text-decoration:underline}',
+        '.shelf+.shelf{margin-top:46px}',
+        '.shelf-head{margin-bottom:22px}',
+        '.shelf-head .shelf-art{width:46px;height:40px;flex:0 0 auto}',
         '.shelf-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px}',
         '.shelf-card a{display:block;color:inherit;text-decoration:none}',
         '.shelf-image{display:block;aspect-ratio:1.55;overflow:hidden;border-radius:9px;background:var(--beige)}',
@@ -379,11 +374,17 @@ function buildAssets() {
         '.shelf-card a:hover img{transform:scale(1.04)}',
         '.shelf-card h3{margin:11px 0 5px;font-size:13px;line-height:1.65}',
         '.shelf-card time{color:#a39690;font-size:10px}',
+        // 見出しを中央に寄せたので、一覧へのリンクはカードの下の右端に置きます
+        '.shelf-more{display:block;width:fit-content;margin:16px 0 0 auto;color:var(--pink-dark);',
+        'font-size:12px;text-decoration:none}',
+        '.shelf-more:hover{text-decoration:underline}',
         // スマホ・タブレットは2×2
         '@media(max-width:900px){.shelf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}',
-        '@media(max-width:600px){.shelf-section{padding-top:38px}.shelf+.shelf{margin-top:32px}',
-        '.shelf-grid{gap:12px}.shelf-head h2{font-size:16px}',
-        '.shelf-card h3{margin-top:8px;font-size:12px;line-height:1.55}.shelf-card time{font-size:9px}}',
+        '@media(max-width:600px){.shelf-section{padding-top:38px}.shelf+.shelf{margin-top:36px}',
+        '.shelf-head{margin-bottom:16px}.shelf-head .shelf-art{width:38px;height:33px}',
+        '.shelf-grid{gap:12px}',
+        '.shelf-card h3{margin-top:8px;font-size:12px;line-height:1.55}.shelf-card time{font-size:9px}',
+        '.shelf-more{margin-top:12px}}',
       ].join(''),
       // メニューの現在地。
       // 旧テーマは「1つめの項目（ホーム）を常に光らせる」作りだったので、
