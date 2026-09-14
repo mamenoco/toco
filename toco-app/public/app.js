@@ -1667,6 +1667,7 @@ function fillMetaForm() {
   $('#pubDesc').value = m.description || '';
   $('#pubDate').value = (m.date || '').slice(0, 10);
   $$('input[name=pubStatus]').forEach((r) => { r.checked = r.value === (m.status === 'publish' ? 'publish' : 'draft'); });
+  $('#pubPickup').checked = m.pickup === 'true';
   updateUrlPreview();
   renderPubReady();
   renderEyecatch();
@@ -1694,6 +1695,7 @@ $('#btnSaveMeta').addEventListener('click', async () => {
     category: $('#pubCategory').value, tags: $('#pubTags').value,
     description: $('#pubDesc').value.trim(), date: $('#pubDate').value,
     status: document.querySelector('input[name=pubStatus]:checked').value,
+    pickup: $('#pubPickup').checked,
     article: $('#articleText').value,
   });
   CURRENT.slug = slug;
@@ -2125,9 +2127,21 @@ async function renderPublish() {
     <td class="note" style="padding:10px">/${esc(a.slug)}/</td>
     <td>${esc(catName(a.category))}</td>
     <td class="note" style="padding:10px">${esc(a.updated || a.mtime)}</td>
+    <td class="r"><button class="${a.pickup ? 'primary' : 'ghost'}" data-pickup="${a.slug}">
+      ${a.pickup ? '載せる' : '載せない'}</button></td>
     <td class="r"><button class="${a.status === 'publish' ? 'primary' : 'ghost'}" data-toggle="${a.slug}">
       ${a.status === 'publish' ? '公開中' : '下書き'}</button></td></tr>`).join('')
-    || '<tr><td colspan="5" class="note">記事がありません。</td></tr>';
+    || '<tr><td colspan="6" class="note">記事がありません。</td></tr>';
+
+  // トップの「ピックアップ記事」に載せるかを、ここでまとめて切り替えます
+  $('#pubArticleRows').querySelectorAll('[data-pickup]').forEach((b) => b.addEventListener('click', async () => {
+    const slug = b.dataset.pickup;
+    const pr = STATE.projects.find((p) => p.slug === slug);
+    if (!pr) return toast('この記事はアプリの管理下にありません。記事画面から開いてください');
+    const now = s.articles.list.find((a) => a.slug === slug).pickup;
+    await api('article/save', { id: pr.id, slug, pickup: !now });
+    await refresh(); renderPublish();
+  }));
 
   $('#pubArticleRows').querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', async () => {
     const slug = b.dataset.toggle;

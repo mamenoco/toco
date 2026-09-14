@@ -393,6 +393,7 @@
         <label style="margin:0"><input type="radio" name="pubStatus" value="draft" checked> 下書き（サイトに出さない）</label>
         <label style="margin:0"><input type="radio" name="pubStatus" value="publish"> 公開</label>
       </div>
+      <label style="margin:12px 0 0"><input type="checkbox" id="pubPickup"> トップの「ピックアップ記事」に載せる</label>
       <div id="pubReady" style="margin-top:12px"></div>
       <div class="row" style="margin-top:12px">
         <button class="primary big" id="btnPublishNow">サイトに反映する</button>
@@ -445,7 +446,7 @@
   <div class="card">
     <h3>記事の公開状態</h3>
     <p class="note">ここでまとめて切り替えられます。切り替えたあと「サイトに反映する」を押すと公開されます。</p>
-    <table class="tbl"><thead><tr><th>タイトル</th><th>URL</th><th>カテゴリ</th><th>更新</th><th class="r">状態</th></tr></thead>
+    <table class="tbl"><thead><tr><th>タイトル</th><th>URL</th><th>カテゴリ</th><th>更新</th><th class="r">ピックアップ</th><th class="r">状態</th></tr></thead>
       <tbody id="pubArticleRows"></tbody></table>
   </div>
 

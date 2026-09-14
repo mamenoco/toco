@@ -727,6 +727,8 @@ const server = http.createServer(async (req, res) => {
           : String(body.tags).split(/[,、]/).map((s) => s.trim()).filter(Boolean);
       }
       if (body.status != null) patch.status = body.status === 'publish' ? 'publish' : 'draft';
+      // 載せないときは空にして、記事ファイルから項目ごと消します
+      if (body.pickup != null) patch.pickup = (body.pickup === true || body.pickup === 'true') ? 'true' : '';
       if (body.title != null) pr.title = body.title;
 
       const saved = writeArticle(pr, body.article != null ? body.article : null, patch);

@@ -13,8 +13,9 @@ const path = require('path');
 const APP = path.join(__dirname, '..');
 const DIR = path.join(APP, '..', 'articles');
 
+// ここに無い項目は、アプリで保存したときに消えます。項目を増やしたらここにも足すこと
 const FIELDS = ['title', 'slug', 'category', 'tags', 'date', 'updated',
-  'description', 'eyecatch', 'status'];
+  'description', 'eyecatch', 'status', 'pickup'];
 
 function ensureDir() { fs.mkdirSync(DIR, { recursive: true }); }
 
@@ -97,6 +98,8 @@ function list() {
         title: a.meta.title || (h1 ? h1[1].trim() : slug),
         category: a.meta.category || '',
         status: a.meta.status || 'draft',
+        // トップの「ピックアップ記事」に載せるか
+        pickup: a.meta.pickup === 'true',
         date: a.meta.date || '',
         updated: a.meta.updated || '',
         description: a.meta.description || '',
