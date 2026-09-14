@@ -8,6 +8,7 @@ updated: 2026-09-14
 description: 同じ1番刈りでも茎の太さや葉と穂の入り方はお店ごとに違います。食べ残しの減らし方や粉の少ない商品の選び方、袋の分け方と保管のコツまで、6商品の口コミとあわせて紹介します。
 eyecatch: /assets/eyecatch/rabbit-timothy-first.jpg
 status: publish
+pickup: true
 ---
 # うさぎのチモシー1番刈りのおすすめ6選｜硬さの選び方や食べ残しが多い子向けの商品まで紹介
 

@@ -8,6 +8,7 @@ updated: 2026-09-10
 description: 部屋んぽ用のサークルを、高さ・倒れにくさ・素材・床の汚れ対策・片づけやすさの5つで比べました。ケージにつなげるタイプから折りたたみ式まで7商品を紹介し、越えられない高さの目安やかじり対策もまとめています。
 eyecatch: /assets/eyecatch/rabbit-playpen.jpg
 status: publish
+pickup: true
 ---
 # うさぎのサークルのおすすめ7選｜部屋んぽ用の高さの選び方や掃除がラクな商品まで紹介
 

@@ -8,6 +8,7 @@ updated: 2026-09-11
 description: うさぎの消臭剤を、舐めても大丈夫な成分か・香りのあるなし・尿石汚れを落とせるかの3点で比べました。スプレー型と置き型の使い分けや、こびりついた尿石の落とし方、使う頻度の目安まで紹介しています。
 eyecatch: /assets/eyecatch/rabbit-deodorant.jpg
 status: publish
+pickup: true
 ---
 # うさぎの消臭剤のおすすめ7選｜舐めても安全な成分の選び方や掃除のコツまで詳しく紹介
 

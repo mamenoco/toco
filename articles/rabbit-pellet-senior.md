@@ -8,6 +8,7 @@ updated: 2026-09-14
 description: 5歳を過ぎたうさぎのペレット選びを、粒の硬さ・ふやかしやすさ・主原料とカルシウム・配合・内容量の5つから解説します。食べ残しが増えてきた子や、噛む力が落ちてきた子に合わせた8商品を口コミとあわせて紹介します。
 eyecatch: /assets/eyecatch/rabbit-pellet-senior.jpg
 status: publish
+pickup: true
 ---
 # うさぎのシニア用ペレットのおすすめ8選｜粒の硬さや食べない子向けの選び方まで紹介
 

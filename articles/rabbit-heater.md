@@ -8,6 +8,7 @@ updated: 2026-09-11
 description: シート型と保温電球の違いや、コードのいたずら対策、ワット数とサイズの選び方をまとめました。おすすめ5商品の口コミや向いている場面もあわせて紹介するので、冬の寒さ対策を整えたい方はぜひ参考にしてみてください。
 eyecatch: /assets/eyecatch/rabbit-heater.jpg
 status: publish
+pickup: true
 ---
 # うさぎのヒーターのおすすめ5選｜冬の寒さ対策やコードのいたずら防止まで詳しく紹介
 

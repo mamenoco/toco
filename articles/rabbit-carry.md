@@ -8,6 +8,7 @@ updated: 2026-09-08
 description: うさぎのキャリーバッグを、素材・体を伸ばせる大きさ・すのこの有無など5つのポイントから解説します。布・ハード・ワイヤーの違いや、通院と災害の備えを兼ねる選び方、おすすめ6商品の口コミもまとめました。
 eyecatch: /assets/eyecatch/rabbit-carry.jpg
 status: publish
+pickup: true
 ---
 # うさぎのキャリーバッグのおすすめ6選｜通院や災害時の備えまで詳しく紹介
 

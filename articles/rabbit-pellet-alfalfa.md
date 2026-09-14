@@ -8,6 +8,7 @@ updated: 2026-09-14
 description: アルファルファペレットは、アルファルファの入り方・主食か補助か・年齢と体重・カルシウムとタンパク質・内容量と粒の形の5点で選べます。子うさぎ向けの主食から混ぜて使える牧草100%タイプまで、8商品の特徴と口コミをまとめました。
 eyecatch: /assets/eyecatch/rabbit-pellet-alfalfa.jpg
 status: publish
+pickup: true
 ---
 # うさぎのアルファルファペレットのおすすめ8選｜子うさぎ期の選び方や与える量まで紹介
 
