@@ -174,25 +174,19 @@ function cardImage(article) {
   return article.eyecatch || '/assets/images/card-default.jpg';
 }
 
-function pickupCard(a) {
+function pickupCard(a, withBadge) {
   const cat = categoryOf(a.category);
+  const badge = withBadge === false ? ''
+    : `<span class="cat-tag cat-${esc(cat.slug || 'other')}">${esc(cat.name)}</span>`;
   return `<article class="pickup-card">
-  <a class="pickup-image" href="/${esc(a.slug)}/"><img src="${esc(cardImage(a))}" alt="" loading="lazy"><span class="cat-tag cat-${esc(cat.slug || 'other')}">${esc(cat.name)}</span></a>
+  <a class="pickup-image" href="/${esc(a.slug)}/"><img src="${esc(cardImage(a))}" alt="" loading="lazy">${badge}</a>
   <h3><a href="/${esc(a.slug)}/">${esc(a.title)}</a></h3>
   <time datetime="${esc(a.date)}">${formatDate(a.date)}</time>
 </article>`;
 }
 
-// トップの「カテゴリの新着」の棚。カテゴリごとに新しい順で4件
-const SHELF_SIZE = 4;
-
-function shelfCard(a) {
-  return `<article class="shelf-card"><a href="/${esc(a.slug)}/">
-  <span class="shelf-image"><img src="${esc(cardImage(a))}" alt="" loading="lazy"></span>
-  <h3>${esc(a.title)}</h3>
-  <time datetime="${esc(a.date)}">${formatDate(a.date)}</time>
-</a></article>`;
-}
+// トップの「カテゴリの新着」の棚。カテゴリごとに新しい順で10件を横スライドで
+const SHELF_SIZE = 10;
 
 function shelvesHtml(published) {
   // コラムは下に専用の枠があるので、ここには並べません。
@@ -202,7 +196,11 @@ function shelvesHtml(published) {
     if (!list.length) return '';
     return `        <div class="shelf">
             <div class="center-heading shelf-head"><span class="category-art category-art-${i + 1} shelf-art" aria-hidden="true"></span><h2>${esc(c.name)}</h2></div>
-            <div class="shelf-grid">${list.map(shelfCard).join('\n')}</div>
+            <div class="pickup-viewport">
+                <button class="pickup-nav prev" type="button" aria-label="前の記事を見る" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+                <div class="pickup-grid" role="region" aria-label="${esc(c.name)}の新着記事" tabindex="0">${list.map((a) => pickupCard(a, false)).join('\n')}</div>
+                <button class="pickup-nav next" type="button" aria-label="次の記事を見る" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+            </div>
             <a class="shelf-more" href="/category/${esc(c.slug)}/">もっと見る ›</a>
         </div>`;
   }).filter(Boolean);
@@ -367,23 +365,12 @@ function buildAssets() {
         '.shelf+.shelf{margin-top:46px}',
         '.shelf-head{margin-bottom:22px}',
         '.shelf-head .shelf-art{width:46px;height:40px;flex:0 0 auto}',
-        '.shelf-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px}',
-        '.shelf-card a{display:block;color:inherit;text-decoration:none}',
-        '.shelf-image{display:block;aspect-ratio:1.55;overflow:hidden;border-radius:9px;background:var(--beige)}',
-        '.shelf-image img{width:100%;height:100%;object-fit:cover;transition:transform .25s ease}',
-        '.shelf-card a:hover img{transform:scale(1.04)}',
-        '.shelf-card h3{margin:11px 0 5px;font-size:13px;line-height:1.65}',
-        '.shelf-card time{color:#a39690;font-size:10px}',
         // 見出しを中央に寄せたので、一覧へのリンクはカードの下の右端に置きます
         '.shelf-more{display:block;width:fit-content;margin:16px 0 0 auto;color:var(--pink-dark);',
         'font-size:12px;text-decoration:none}',
         '.shelf-more:hover{text-decoration:underline}',
-        // スマホ・タブレットは2×2
-        '@media(max-width:900px){.shelf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}',
         '@media(max-width:600px){.shelf-section{padding-top:38px}.shelf+.shelf{margin-top:36px}',
         '.shelf-head{margin-bottom:16px}.shelf-head .shelf-art{width:38px;height:33px}',
-        '.shelf-grid{gap:12px}',
-        '.shelf-card h3{margin-top:8px;font-size:12px;line-height:1.55}.shelf-card time{font-size:9px}',
         '.shelf-more{margin-top:12px}}',
       ].join(''),
       // メニューの現在地。

@@ -88,15 +88,17 @@
     }
   }
 
-  // ---- ピックアップ記事の横スライド ----
+  // ---- 横スライド（ピックアップ記事・カテゴリの新着記事） ----
   // スクロールできる状態のときだけ左右のボタンを出します。
   // JSが動かない環境でも、指やトラックパッドで横に送れます。
-  initPickupSlider();
+  // トップには複数のスライドがあるので、枠（.pickup-viewport）ごとに動かします。
+  var viewports = document.querySelectorAll('.pickup-viewport');
+  for (var v = 0; v < viewports.length; v++) initSlider(viewports[v]);
 
-  function initPickupSlider() {
-    var track = document.querySelector('.pickup-grid');
-    var prev = document.querySelector('.pickup-nav.prev');
-    var next = document.querySelector('.pickup-nav.next');
+  function initSlider(viewport) {
+    var track = viewport.querySelector('.pickup-grid');
+    var prev = viewport.querySelector('.pickup-nav.prev');
+    var next = viewport.querySelector('.pickup-nav.next');
     if (!track || !prev || !next) return;
 
     // カードの左端が並ぶ位置の一覧。
