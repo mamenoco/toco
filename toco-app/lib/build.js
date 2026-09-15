@@ -896,6 +896,11 @@ function buildFrontPage(published, ctx) {
   // ピックアップは、記事画面で「ピックアップに載せる」にした記事だけ。
   // 1本も選ばれていないあいだは、空欄にならないよう新しい順で出します。
   const picked = published.filter((a) => a.pickup);
+  // site-config の pickupFirst に書いた記事を、書いた順に先頭へ出します。
+  // それ以外は元の並び（新しい順）のまま後ろに続きます（sort は同じ順位の並びを崩しません）
+  const first = config.pickupFirst || [];
+  const rank = (a) => { const i = first.indexOf(a.slug); return i === -1 ? first.length : i; };
+  picked.sort((a, b) => rank(a) - rank(b));
   const pickup = (picked.length ? picked : published).slice(0, 15);
   let columns = published.filter((a) => a.category === 'column').slice(0, 5);
   if (!columns.length) columns = pickup.slice(0, 5);
