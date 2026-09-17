@@ -301,7 +301,13 @@ function render(md, opts) {
     const bm = line.match(BOLD_ONLY);
     if (bm) {
       boldSinceHeading++;
-      para(inline(bm[1]), inProductSection ? 'catch' : 'lead');
+      // 商品カードのすぐあとの太字は、その商品の一文キャッチです。
+      // 見出しが「おすすめ○選」でない商品の並び（「家で使える◯◯もご紹介」など）でも
+      // 電球アイコンの帯にならないよう、直前の行も見ます。
+      let back = i - 1;
+      while (back >= 0 && !lines[back].trim()) back--;
+      const afterCard = /^\{\{product:/.test(lines[back] || '');
+      para(inline(bm[1]), (inProductSection || afterCard) ? 'catch' : 'lead');
       i++; continue;
     }
 
