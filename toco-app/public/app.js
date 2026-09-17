@@ -657,13 +657,13 @@ function renderPicked() {
   const list = CURRENT.products || [];
   $('#pickedCount').textContent = list.length + '点';
   $('#pickedList').innerHTML = list.length ? list.map((p, i) => `
-    <div class="item"><img src="${esc(p.image)}" alt="">
+    <div class="item" draggable="true" data-idx="${i}" style="cursor:grab"><span class="note" style="min-width:1.7em;text-align:right;flex:none">${i + 1}</span><img src="${esc(p.image)}" alt="" draggable="false">
       <div class="body"><div class="nm">${esc(p.name)}</div>
         <div class="mt">${esc(p.shop)}　★${p.reviewAverage || '-'}（${p.reviewCount || 0}件）
           ${p.owned ? '<span class="badge own">体験あり</span>' : ''}
           ${p.reviewText ? '<span class="badge rev">口コミ取得済み</span>' : ''}
           ${Object.keys(p.specs || {}).length ? '<span class="badge">スペック入力済み</span>' : ''}</div>
-        <div class="acts"><button class="ghost" data-spec="${i}">スペックを入れる</button>
+        <div class="acts"><button class="ghost" data-up="${i}" ${i === 0 ? "disabled" : ""} title="上へ">↑</button><button class="ghost" data-down="${i}" ${i === list.length - 1 ? "disabled" : ""} title="下へ">↓</button><button class="ghost" data-spec="${i}">スペックを入れる</button>
           <button class="ghost danger" data-rm="${i}">外す</button></div>
       </div></div>`).join('') : '<p class="note">まだ商品が選ばれていません。</p>';
 
@@ -673,7 +673,78 @@ function renderPicked() {
   }));
   $('#pickedList').querySelectorAll('[data-spec]').forEach((b) =>
     b.addEventListener('click', () => editSpecs(Number(b.dataset.spec))));
+
+  // 並び順は、そのまま記事に出る順番になります。
+  // 実際に使っている商品を先頭に置くため、あとから入れ替えられるようにしています。
+  if (list.length > 1) {
+    $('#pickedList').insertAdjacentHTML('afterbegin',
+      '<p class="note">上から順に記事へ出ます。行を<b>ドラッグ</b>するか、<b>↑↓</b>で並び替えられます。</p>');
+  }
+  $('#pickedList').querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', () => {
+    const i = Number(b.dataset.up); swapPicked(i, i - 1);
+  }));
+  $('#pickedList').querySelectorAll('[data-down]').forEach((b) => b.addEventListener('click', () => {
+    const i = Number(b.dataset.down); swapPicked(i, i + 1);
+  }));
+  enablePickedDrag();
+
   markStepsDone();
+}
+
+// 隣と入れ替える
+async function swapPicked(i, j) {
+  const l = (CURRENT.products || []).slice();
+  if (!l[i] || !l[j]) return;
+  [l[i], l[j]] = [l[j], l[i]];
+  await saveProject({ products: l });
+  renderPicked(); renderReviewStep();
+  toast('並び替えました');
+}
+
+// ドラッグで好きな位置へ動かす
+function enablePickedDrag() {
+  const rows = [...$('#pickedList').querySelectorAll('[data-idx]')];
+  if (rows.length < 2) return;
+  let from = -1;
+  const clear = () => rows.forEach((r) => { r.style.boxShadow = ''; });
+
+  rows.forEach((row) => {
+    row.addEventListener('dragstart', (e) => {
+      from = Number(row.dataset.idx);
+      row.style.opacity = '.4';
+      try { e.dataTransfer.setData('text/plain', 'row'); } catch (err) { /* 一部の環境で失敗します */ }
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => { row.style.opacity = ''; clear(); from = -1; });
+    row.addEventListener('dragover', (e) => {
+      if (from < 0 || Number(row.dataset.idx) === from) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      clear();
+      row.style.boxShadow = (e.clientY - r.top) < r.height / 2
+        ? '0 -3px 0 var(--accent)' : '0 3px 0 var(--accent)';
+    });
+    row.addEventListener('drop', async (e) => {
+      if (from < 0) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      const at = Number(row.dataset.idx) + ((e.clientY - r.top) < r.height / 2 ? 0 : 1);
+      const src = from;
+      from = -1; clear();
+      await movePicked(src, at);
+    });
+  });
+}
+
+// from の商品を、at の位置の手前へ移す
+async function movePicked(from, at) {
+  const l = (CURRENT.products || []).slice();
+  if (!l[from] || at === from || at === from + 1) return;
+  const [x] = l.splice(from, 1);
+  l.splice(at > from ? at - 1 : at, 0, x);
+  await saveProject({ products: l });
+  renderPicked(); renderReviewStep();
+  toast('並び替えました');
 }
 
 const SPEC_PRESET = {
