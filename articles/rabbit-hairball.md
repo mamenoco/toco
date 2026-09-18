@@ -4,7 +4,7 @@ slug: rabbit-hairball
 category: care
 tags: [毛球対策, 換毛期, 選び方, お手入れ]
 date: 2026-09-16
-updated: 2026-09-16
+updated: 2026-09-18
 description: うさぎの毛球対策グッズを、ペレット・ペースト・おやつ・サプリの7点で紹介します。主食から替えるか今のごはんに足すかの決め方、中身の系統、食いつき、年齢や量の目安まで分かります。
 eyecatch: /assets/eyecatch/rabbit-hairball.jpg
 status: publish

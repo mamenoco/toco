@@ -4,7 +4,7 @@ slug: rabbit-winter-cold
 category: column
 tags: [寒さ対策, 冬, 温度管理, ヒーター]
 date: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
 description: うさぎが冬を快適に過ごせる室温と湿度の目安、ケージの置き場所や床の見直し方をまとめました。夜間や留守中の冷え込み対策、体調の変化を見るポイント、温湿度計やヒーターなど場面別に使うものも紹介しています。
 eyecatch: /assets/eyecatch/rabbit-winter-cold.jpg
 status: publish

@@ -1408,6 +1408,7 @@ $('#btnInsertCard').addEventListener('click', async () => {
       </select></label>
     <div class="row end"><button class="ghost" id="cardCancel">やめる</button>
       <button class="primary" id="cardOk">入れる</button></div>`);
+  $('#cardPick').selectedIndex = 0;   // 何も選ばれていない状態を避けます
   $('#cardCancel').onclick = closeModal;
   $('#cardOk').onclick = async () => {
     const slug = $('#cardPick').value;
@@ -2883,6 +2884,8 @@ function applyKind(kind) {
     const el = $(sel); if (el) el.hidden = column;
   });
   const box = $('#columnPickBox'); if (box) box.hidden = !column;
+  // 本文を書いたあと、流れに合わせて差し込むためのボタン（コラムだけ）
+  const ins = $('#btnInsertProduct'); if (ins) ins.hidden = !column;
 
   $('#kindNote').innerHTML = column
     ? 'コラムでは比較表とスペック表を作りません。商品の紹介は2〜3文にとどめて、'
@@ -3071,3 +3074,75 @@ async function moveCardLine(from, to, at) {
   await renderPreview({ keepScroll: true, skipBuild: true });
   toast('記事カードを移動しました');
 }
+
+// 本文の好きな場所に、商品のかたまりを差し込む（コラム用）
+//
+// コラムは、先に商品を決めるより、文の流れに合わせてあとから入れるほうが書きやすいためです。
+// 入る形はスタイルガイドの「2-2. コラム記事の型」と同じで、
+// 見出し → 商品カード → （2〜3文）→ 送り先の記事へのリンク、の順です。
+$('#btnInsertProduct').addEventListener('click', async () => {
+  if (!CURRENT) return;
+  let r;
+  try { r = await api('products/published'); } catch (e) { return; }
+  const list = r.items || [];
+  if (!list.length) return toast('商品紹介の記事を公開すると、ここから選べるようになります');
+
+  const where = LAST_BLOCK
+    ? '選んだ段落の下に入れます'
+    : '記事の最後に入れます（プレビューで段落をクリックすると、その下に入れられます）';
+
+  modal(`<h3>商品を入れる</h3>
+    <p class="note">${esc(where)}<br>
+      見出し・商品カード・送り先の記事へのリンクがまとめて入ります。
+      間の2〜3文は、そのあとご自身で書き足してください。</p>
+    <label>絞り込み<input id="prodFilter" placeholder="商品名や記事名の一部（例：ヒーター）"></label>
+    <label>どの商品を入れますか（${list.length}点）
+      <select id="prodPick" size="10" style="height:auto"></select></label>
+    <div class="row end"><button class="ghost" id="prodCancel">やめる</button>
+      <button class="primary" id="prodOk">入れる</button></div>`);
+
+  // 公開ずみの記事で扱った商品が全部並ぶと数が多すぎるので、絞り込めるようにします
+  const fillProdPick = () => {
+    const q = ($('#prodFilter').value || '').trim();
+    const hit = q ? list.filter((x) => (x.name + ' ' + x.articles[0].title).includes(q)) : list;
+    $('#prodPick').innerHTML = hit.length
+      ? hit.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}　→　${esc(x.articles[0].title)}</option>`).join('')
+      : '<option value="">該当する商品がありません</option>';
+    // 一覧型のセレクトは、中身を入れ替えても何も選ばれていない状態になります。
+    // そのままだと「入れる」を押しても何も起きないので、先頭を選んでおきます。
+    $('#prodPick').selectedIndex = 0;
+  };
+  fillProdPick();
+  $('#prodFilter').addEventListener('input', fillProdPick);
+  $('#prodFilter').focus();
+
+  $('#prodCancel').onclick = closeModal;
+  $('#prodOk').onclick = async () => {
+    const id = $('#prodPick').value;
+    if (!id) return toast('商品を選んでください');
+    const x = list.find((y) => y.id === id);
+    const to = x.articles[0];
+
+    pushUndo('商品を入れる');
+    const lines = $('#articleText').value.split('\n');
+    const at = LAST_BLOCK ? LAST_BLOCK[1] + 1 : lines.length;
+    lines.splice(at, 0, '', `### ${x.name}`, '', `{{product:${x.id}}}`, '',
+      `詳しくは{{link:${to.slug}|${to.title}}}で紹介しています。`);
+    $('#articleText').value = lines.join('\n').replace(/\n{3,}/g, '\n\n');
+    closeModal();
+
+    // ステップ1の「この記事で触れる商品」とも合わせておきます
+    const picked = CURRENT.columnProducts || [];
+    if (!picked.includes(id)) {
+      const next = picked.concat([id]);
+      await api('project/update', { id: CURRENT.id, columnProducts: next });
+      CURRENT.columnProducts = next;
+      COL_PICKED = next.slice();
+    }
+
+    await saveProject({ article: $('#articleText').value });
+    updateChars();
+    await renderPreview({ keepScroll: true, skipBuild: true });
+    toast('入れました。カードの下に2〜3文を書き足してください');
+  };
+});

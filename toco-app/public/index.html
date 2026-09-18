@@ -191,6 +191,8 @@
       <p class="note">コラムで触れてよいのは、<b>すでに商品紹介の記事で扱っている商品</b>だけです。
         そうしておくと、送り先の記事が必ずあります。<b>2〜4点まで。</b>
         紹介は2〜3文にとどめて、詳しい話はその記事へ送ります。</p>
+      <p class="note">ここで決めなくても構いません。<b>本文を書いたあと、「3 公開前チェック」の「商品を入れる」から、文の流れに合わせて差し込めます。</b>
+        先に選んでおくと、Claudeに書いてもらうときの材料に入ります。</p>
       <label>絞り込み<input id="colFilter" placeholder="商品名の一部（例：ブラシ）"></label>
       <div id="colProducts" class="list" style="max-height:340px;overflow:auto"></div>
       <div class="row" style="margin-top:10px">
@@ -324,6 +326,7 @@
           <button class="primary" id="btnMark">マーカーを引く</button>
           <button class="ghost" id="btnUnmark">装飾を外す</button>
         </span>
+        <button class="ghost" id="btnInsertProduct" hidden>商品を入れる</button>
         <button class="ghost" id="btnInsertCard">記事カードを入れる</button>
         <button class="ghost" id="btnBoldToMark">本文の太字をすべてマーカーに</button>
         <span class="note" id="markNote">文章をドラッグして選んでください</span>
