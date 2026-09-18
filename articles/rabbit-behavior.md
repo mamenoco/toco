@@ -1,5 +1,5 @@
 ---
-title: うさぎのしぐさの意味｜足ダン・ゴロン・鼻ツン
+title: うさぎのしぐさの意味｜足ダン・ゴロン・鼻ツンや注意したいしぐさもご紹介
 slug: rabbit-behavior
 category: column
 tags: [しぐさ, 足ダン, うさぎの気持ち, 行動]
