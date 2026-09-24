@@ -246,7 +246,6 @@ status: publish
 シリンジだけでは看護はまわりません。ふやかして使えるペレットや、こぼれにくい{{link:food-bowl|食器}}、水分量が分かる{{link:rabbit-bottle|給水ボトル}}をそろえておくと、食べた量と飲んだ量を追いやすくなります。
 
 噛む力が落ちてきた時期の食事は{{link:rabbit-pellet-senior|うさぎのシニア用ペレット}}に、食欲が戻り始めたころの牧草は{{link:rabbit-timothy-soft|やわらかいチモシー}}にまとめました。ぜひあわせてチェックしてみてください。
-{{card:rabbit-pellet-senior}}
 
 ## 食欲が落ちたときのために、シリンジを備えておこう
 

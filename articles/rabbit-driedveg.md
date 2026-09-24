@@ -315,8 +315,6 @@ status: publish
 
 乾燥野菜は、あくまで食事の脇役です。土台になる{{link:rabbit-timothy|チモシー}}と{{link:rabbit-pellet|ペレット}}が安定していれば、野菜の量で悩む場面はぐっと減ります。
 
-{{card:rabbit-timothy}}
-
 細かいかけらが落ちても拾いやすい{{link:food-bowl|食器}}や、牧草をしっかり食べてもらうための{{link:rabbit-hayrack-hay|牧草入れ}}もあわせて見ておくと、食べ方が整ってきますよ。ぜひあわせてチェックしてみてください。
 
 ## うさぎに合った乾燥野菜を見つけよう

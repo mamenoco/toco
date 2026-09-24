@@ -1208,6 +1208,10 @@ async function renderPreview(opts) {
     d.addEventListener('mouseup', updateMarkTools);
     d.addEventListener('keyup', updateMarkTools);
     d.addEventListener('click', (e) => {
+      // 記事カードや文中のリンクは、押すとプレビューの中身がリンク先に切り替わってしまい、
+      // ダブルクリックで編集できません。別タブで開くリンク（商品の購入ボタンなど）以外は止めます。
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (a && a.target !== '_blank' && !a.getAttribute('href').startsWith('#')) e.preventDefault();
       const b = e.target.closest && e.target.closest('[data-ln]');
       if (b) LAST_BLOCK = b.getAttribute('data-ln').split(',').map(Number);
     });

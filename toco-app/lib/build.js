@@ -658,43 +658,64 @@ function shortDesc(text) {
   return at >= 24 ? cut.slice(0, at + 1) : cut.slice(0, 46) + '…';
 }
 
-// 単独の記事カード（{{card:スラッグ}}）
-function articleCard(slug, ctx) {
-  const a = ctx.bySlug[slug];
-  if (!a) return '<!-- 記事が見つかりません: ' + esc(slug) + ' -->';
-  if (a.status !== 'publish') {
-    return '<div class="link-todo-card">' + esc(a.title)
-      + '（下書きのため、公開されるとカードが出ます）</div>';
-  }
-  return '<div class="rel-cards"><a class="related-link has-img" href="/' + esc(slug) + '/">'
+// 記事カード1枚ぶんのHTML。label は左上の小さな見出し（関連記事／あわせて読みたい）
+function relatedCard(a, slug, label) {
+  return '<a class="related-link has-img" href="/' + esc(slug) + '/">'
     + '<img src="' + esc(cardImage(a)) + '" alt="" loading="lazy">'
-    + '<span class="rel-text"><small>あわせて読みたい</small>'
+    + '<span class="rel-text"><small>' + esc(label) + '</small>'
     + '<strong>' + esc(a.title) + '</strong>'
     + (a.description ? '<em>' + esc(shortDesc(a.description)) + '</em>' : '')
-    + '</span></a></div>';
+    + '</span></a>';
 }
 
-function makeLinkResolver(ctx) {
-  // 同じ記事のカードが何枚も出ないよう、1記事につき1回だけにします
-  const carded = new Set();
-  return (slug, label) => {
+// {{link:…}}（文中のリンク＋カード）と {{card:…}}（カードだけ）の解決先。
+// 1つの記事を描くあいだ、どのカードをどこに出したかを両方で共有します。
+//   ・同じ記事のカードは、記事全体で1回だけ
+//   ・ただし「〇〇と一緒に見ておきたいもの」の節（sec.related）では、前半で出していても出す
+//     ここは記事を紹介するための節なので、リンクだけ並んでもカードが無いと役目を果たせません
+//   ・同じ節の中では、どちらの書き方でも同じカードを2枚出さない
+function cardResolvers(ctx) {
+  const carded = new Set();          // 記事全体で出したカード
+  const bySection = new Map();       // 節ごとに出したカード
+  const inSection = (sec) => {
+    const n = sec ? sec.n : 0;
+    if (!bySection.has(n)) bySection.set(n, new Set());
+    return bySection.get(n);
+  };
+  const mark = (slug, sec) => { carded.add(slug); inSection(sec).add(slug); };
+
+  const link = (slug, label, sec) => {
     const a = ctx.bySlug[slug];
     if (!a || a.status !== 'publish') {
       return { html: '<span class="link-todo" title="記事ができたらリンクになります">' + esc(label) + '</span>' };
     }
     const html = '<a href="/' + esc(slug) + '/">' + esc(label) + '</a>';
-    if (carded.has(slug)) return { html };
-    carded.add(slug);
-    return {
-      html,
-      card: '<a class="related-link has-img" href="/' + esc(slug) + '/">'
-        + '<img src="' + esc(cardImage(a)) + '" alt="" loading="lazy">'
-        + '<span class="rel-text"><small>関連記事</small>'
-        + '<strong>' + esc(a.title) + '</strong>'
-        + (a.description ? '<em>' + esc(shortDesc(a.description)) + '</em>' : '')
-        + '</span></a>',
-    };
+    const shown = (sec && sec.related) ? inSection(sec).has(slug) : carded.has(slug);
+    if (shown) return { html };
+    mark(slug, sec);
+    return { html, card: relatedCard(a, slug, '関連記事') };
   };
+
+  // 単独の記事カード（{{card:スラッグ}}）
+  const card = (slug, sec) => {
+    const a = ctx.bySlug[slug];
+    if (!a) return '<!-- 記事が見つかりません: ' + esc(slug) + ' -->';
+    if (a.status !== 'publish') {
+      return '<div class="link-todo-card">' + esc(a.title)
+        + '（下書きのため、公開されるとカードが出ます）</div>';
+    }
+    if (inSection(sec).has(slug)) {
+      // 同じ節にもう出ています。読者には出さず、アプリのプレビューでだけ知らせます。
+      // 知らせないと、見えない行が本文に残ったままになり、消すこともできません。
+      return (sec && sec.preview)
+        ? '<div class="link-todo-card">同じ記事のカードがすぐ上にあるため、ここには出しません（ダブルクリックで消せます）</div>'
+        : '';
+    }
+    mark(slug, sec);
+    return '<div class="rel-cards">' + relatedCard(a, slug, 'あわせて読みたい') + '</div>';
+  };
+
+  return { link, card };
 }
 
 // 記事に付いているタグ。押すとそのタグの一覧ページへ行きます
@@ -735,8 +756,7 @@ function buildSingle(a, prev, next, ctx) {
     years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
-    link: makeLinkResolver(ctx),
-    card: (slug) => articleCard(slug, ctx),
+    ...cardResolvers(ctx),
   });
 
   const hero = a.eyecatch
@@ -792,8 +812,7 @@ function buildPage(p, ctx) {
     years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
-    link: makeLinkResolver(ctx),
-    card: (slug) => articleCard(slug, ctx),
+    ...cardResolvers(ctx),
   });
   let body = r.html.replace(/\{\{contact-form\}\}/g, () => contactForm());
   // 目次は記事と同じく、最初の見出しの直前に置きます
@@ -1088,8 +1107,7 @@ function renderArticle(md, opts) {
     years: markdown.yearsSince(config.rabbitSince),
     product: (id) => productCard(id, ctx),
     ranking: (kw) => rankingLinks(kw, ctx),
-    link: makeLinkResolver(ctx),
-    card: (slug) => articleCard(slug, ctx),
+    ...cardResolvers(ctx),
     trackSource: !!(opts && opts.trackSource),
   });
   return { html: r.html, toc: r.toc, headings: r.headings };

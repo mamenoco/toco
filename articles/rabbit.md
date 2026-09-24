@@ -315,8 +315,6 @@ status: publish
 
 ドライフルーツは、あくまで食事の脇役です。土台になる{{link:rabbit-timothy|チモシー}}と{{link:rabbit-pellet|ペレット}}が安定していれば、おやつの量で悩む場面はぐっと減ります。
 
-{{card:rabbit-timothy}}
-
 甘いものを控えめにしたい方は、砂糖の入っていない{{link:rabbit-driedveg|乾燥野菜}}に切り替えるという手もあります。換毛期の過ごし方をまとめた{{link:rabbit-molting|うさぎの換毛期}}の記事も、ぜひあわせてチェックしてみてください。
 
 ## うさぎに合ったドライフルーツを見つけよう

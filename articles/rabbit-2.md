@@ -287,11 +287,7 @@ status: publish
 
 クッキーはあくまで食事の脇役です。土台になる{{link:rabbit-timothy|チモシー}}と{{link:rabbit-pellet|ペレット}}が安定していれば、おやつの量で悩む場面はぐっと減ります。
 
-{{card:rabbit-timothy}}
-
 甘いものを控えたい日には、野菜を干しただけの{{link:rabbit-driedveg|乾燥野菜}}に切り替えるのも手。かけらが落ちても拾いやすい{{link:food-bowl|食器}}もあわせて見ておくと、食べ方が整ってきますよ。ぜひあわせてチェックしてみてください。
-
-{{card:rabbit-driedveg}}
 
 ## うさぎに合ったクッキーを見つけよう
 

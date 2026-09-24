@@ -20,6 +20,15 @@ function esc(s) {
 let LINK_RESOLVER = null;
 let LINK_CARDS = [];
 
+// いまどの h2 の中にいるか。記事カードを出すかどうかの判断に使います。
+//   n       … 何番目の h2 か（最初の h2 より前は 0）
+//   related … 「〇〇と一緒に見ておきたいもの」のような、関連記事を紹介する節か
+//   preview … アプリのプレビュー用に描いているか
+// 関連記事の節では、前半ですでにカードを出した記事でもカードを出します。
+// ここは記事を紹介するための節なので、リンクだけが並ぶと役目を果たせないためです。
+let SECTION = { n: 0, related: false, preview: false };
+const RELATED_H2 = /一緒に|あわせて読|関連記事/;
+
 // 「うさぎと暮らして◯年」の◯を、今の日付から計算します。
 // 記事を書いた時点で数字を焼き付けてしまうと、年が変わっても古いままになるためです。
 // since は 'YYYY-MM' か 'YYYY-MM-DD'。満年数（切り捨て）を返します。
@@ -47,7 +56,7 @@ function inline(t) {
       const s = slug.trim();
       const l = (label || slug).trim();
       if (!LINK_RESOLVER) return l;
-      const r = LINK_RESOLVER(s, l);
+      const r = LINK_RESOLVER(s, l, SECTION);
       if (typeof r === 'string') return r;
       if (r && r.card) LINK_CARDS.push(r.card);
       return (r && r.html) || l;
@@ -86,6 +95,7 @@ function render(md, opts) {
   YEARS = options.years != null ? options.years : null;
   LINK_RESOLVER = options.link || null;
   LINK_CARDS = [];
+  SECTION = { n: 0, related: false, preview: trackSource };
   const pendingLinks = [];
   if (!options.link) {
     // 解決先が渡されていないときは、リンク待ちとして記録だけしておきます
@@ -175,7 +185,7 @@ function render(md, opts) {
     // 記事カード。好きな場所に置けます。
     // {{link:…}} が文中のリンク＋カードなのに対し、こちらはカードだけです。
     const cm = line.match(/^\{\{card:([a-z0-9-]+)\}\}$/);
-    if (cm) { push(card(cm[1])); i++; continue; }
+    if (cm) { push(card(cm[1], SECTION)); i++; continue; }
 
     // 見出し
     let m = line.match(/^(#{1,4})\s+(.*)$/);
@@ -183,6 +193,7 @@ function render(md, opts) {
       const lv = m[1].length;
       if (lv === 1) { pendingAnchor = null; i++; continue; }  // h1 は記事タイトルを使う
       if (lv === 2) {
+        SECTION = { n: SECTION.n + 1, related: RELATED_H2.test(m[2]), preview: trackSource };
         inProductSection = /おすすめ.*選/.test(m[2]);
         inFaq = /よくある質問|Q&A|FAQ/i.test(m[2]);
       }
