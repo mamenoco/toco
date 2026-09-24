@@ -1,5 +1,5 @@
 ---
-title: うさぎの寿命は何年？年齢の数え方
+title: うさぎの寿命は何年？年齢の数え方と暮らし方をご紹介
 slug: rabbit-lifespan
 category: column
 tags: [寿命, 年齢, シニア, 健康管理]
