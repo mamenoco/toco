@@ -181,7 +181,6 @@ function pickupCard(a, withBadge) {
   return `<article class="pickup-card">
   <a class="pickup-image" href="/${esc(a.slug)}/"><img src="${esc(cardImage(a))}" alt="" loading="lazy">${badge}</a>
   <h3><a href="/${esc(a.slug)}/">${esc(a.title)}</a></h3>
-  <time datetime="${esc(a.date)}">${formatDate(a.date)}</time>
 </article>`;
 }
 
