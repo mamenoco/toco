@@ -2951,7 +2951,7 @@ function renderColumnPicked() {
   const gone = COL_PICKED.filter((id) => !COL_PRODUCTS.some((x) => x.id === id));
   $('#colPicked').innerHTML = picked.map((x) => `
     <div class="item"><div style="flex:1;min-width:0"><div class="t">${esc(x.name)}</div>
-      <div class="note">{{product:${esc(x.id)}}} ／ 送り先 {{link:${esc(x.articles[0].slug)}|…}}</div></div>
+      <div class="note">{{product:${esc(x.id)}}} ／ 送り先 {{card:${esc(x.articles[0].slug)}}}</div></div>
       <button class="ghost danger" data-col-remove="${esc(x.id)}" style="padding:4px 12px;font-size:12px">外す</button></div>`)
     .concat(gone.map((id) => `
     <div class="item"><div style="flex:1;min-width:0"><div class="t">${esc(id)}</div>
@@ -3097,7 +3097,7 @@ $('#btnInsertProduct').addEventListener('click', async () => {
 
   modal(`<h3>商品を入れる</h3>
     <p class="note">${esc(where)}<br>
-      見出し・商品カード・送り先の記事へのリンクがまとめて入ります。
+      商品カードと、送り先の記事カードがまとめて入ります。
       間の2〜3文は、そのあとご自身で書き足してください。</p>
     <label>絞り込み<input id="prodFilter" placeholder="商品名や記事名の一部（例：ヒーター）"></label>
     <label>どの商品を入れますか（${list.length}点）
@@ -3130,8 +3130,9 @@ $('#btnInsertProduct').addEventListener('click', async () => {
     pushUndo('商品を入れる');
     const lines = $('#articleText').value.split('\n');
     const at = LAST_BLOCK ? LAST_BLOCK[1] + 1 : lines.length;
-    lines.splice(at, 0, '', `### ${x.name}`, '', `{{product:${x.id}}}`, '',
-      `詳しくは{{link:${to.slug}|${to.title}}}で紹介しています。`);
+    // 商品名は商品カードに、記事タイトルは記事カードに出ます。
+    // 見出しや「詳しくは〇〇で紹介しています」を本文に書くと、長い名前が2回並んで読みにくくなるため入れません。
+    lines.splice(at, 0, '', `{{product:${x.id}}}`, '', `{{card:${to.slug}}}`);
     $('#articleText').value = lines.join('\n').replace(/\n{3,}/g, '\n\n');
     closeModal();
 

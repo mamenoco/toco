@@ -68,25 +68,26 @@ function buildColumnBrief(project, mentions) {
   if (!mentions.length) {
     L.push('（商品には触れません。読み物として書いてください）');
   } else {
-    L.push('見出しに商品名を置き、その直後にカードの記法を1行、そのあと2〜3文。');
-    L.push('最後に送り先の記事へのリンクを置きます。書き方の見本：');
+    L.push('商品名の見出し（###）は置きません。商品名は商品カードに出るためです。');
+    L.push('カードの記法を1行、そのあと2〜3文。最後に送り先の記事カードを1行置きます。');
+    L.push('「詳しくは〇〇で紹介しています」のように、記事タイトルをリンクにして本文に書かないこと。');
+    L.push('タイトルは長く、本文に入ると読みにくくなります。書き方の見本：');
     L.push('');
     L.push('```');
-    L.push('### ' + (mentions[0].name || '商品名'));
-    L.push('');
     L.push('{{product:' + (mentions[0].id || 'ID') + '}}');
     L.push('');
     L.push('（この場面でなぜこれなのかを2〜3文。仕様の羅列にしない）');
     L.push('');
-    L.push('詳しくは{{link:' + firstArticle(mentions[0]).slug + '|'
-      + firstArticle(mentions[0]).title + '}}で紹介しています。');
+    L.push('{{card:' + firstArticle(mentions[0]).slug + '}}');
     L.push('```');
+    L.push('');
+    L.push('同じ記事へ送る商品が続くときは、記事カードは最後の商品のあとに1枚だけ置きます。');
     L.push('');
     mentions.forEach((m, i) => {
       L.push(`### ${i + 1}. ${m.name}`);
       L.push('');
       L.push('- **記事に書く記法：`{{product:' + m.id + '}}`**');
-      L.push('- 送り先の記事：' + (m.articles || []).map((a) => `{{link:${a.slug}|${a.title}}}`).join(' / '));
+      L.push('- 送り先の記事カード：' + (m.articles || []).map((a) => `\`{{card:${a.slug}}}\`（${a.title}）`).join(' / '));
       L.push('- 体験：' + (m.owned ? 'あり（実際に使っているので、体験を1文だけ書いてよい）' : 'なし（体験を書かない）'));
       if (m.why) L.push('- この記事で触れる理由：' + m.why);
       L.push('');

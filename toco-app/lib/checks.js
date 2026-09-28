@@ -527,6 +527,18 @@ function runChecks(article, project, inventory, meta) {
     add('warn', '内部リンクが見当たりません', '関連記事へのリンクを1本以上置いてください。');
   }
 
+  // 記事タイトルをそのままリンクにした文。タイトルは長く、本文に入ると読みにくくなります。
+  // リンクの文字は短い言葉にし、記事の紹介は段落の下に出る記事カードに任せます。
+  const titleLinks = [...String(text).matchAll(/\{\{link:[^}|]+\|([^}]*)\}\}/g)]
+    .filter((m) => /｜/.test(m[1]) || m[1].trim().length > 24).length;
+  if (titleLinks) {
+    add('warn', `記事タイトルをそのままリンクにした箇所が${titleLinks}か所あります`,
+      'リンクの文字は「乾燥野菜」のような短い言葉にしてください。記事のタイトルは、段落の下に出る記事カードで読めます。',
+      '{{link:スラッグ|…}} のうち、表示する文字が記事タイトルそのまま（「｜」を含む長いもの）になっている箇所を直してください。'
+      + '文中の短い言葉にリンクを付ける形に書き換えるか、「詳しくは〇〇で紹介しています。」のような文ごと削除して、'
+      + 'その位置に {{card:スラッグ}} の1行を置いてください。ほかの箇所は変更しないでください。');
+  }
+
   // 構成
   const h2 = (text.match(/^##\s+/gm) || []).length;
   if (h2 < (isColumn ? 3 : 4)) {
@@ -602,17 +614,26 @@ function runChecks(article, project, inventory, meta) {
     }
 
     // 商品に触れたら、必ず送り先を置く決まり
-    if (uniq.length && !/\{\{link:/.test(text)) {
-      add('error', '送り先の記事へのリンクがありません',
-        '商品に触れたときは、その商品を詳しく紹介している記事へのリンクを必ず置いてください。'
-        + '（{{link:スラッグ|記事名}} の形）');
+    if (uniq.length && !/\{\{(link|card):/.test(text)) {
+      add('error', '送り先の記事カードがありません',
+        '商品に触れたときは、その商品を詳しく紹介している記事のカードを必ず置いてください。'
+        + '（{{card:スラッグ}} の形）');
+    }
+
+    // 商品名の見出しは置かない。商品名は商品カードに出るので、見出しにすると2回並びます。
+    const namedHeads = (String(text).match(/^###\s+.+\n+\{\{product:/gm) || []).length;
+    if (namedHeads) {
+      add('warn', `商品名の見出しが${namedHeads}か所あります`,
+        'コラムでは商品名の見出し（###）を置きません。商品名は商品カードに出るため、見出しにすると長い名前が2回並びます。',
+        '{{product:…}} の直前にある、商品名だけの ### 見出しの行を削除してください。ほかの箇所は変更しないでください。');
     }
 
     // 商品ごとの紹介が長すぎないか。見出しから次の見出しまでの字数で見ます。
-    const secs = String(text).split(/^###\s+/m).slice(1);
+    // 商品カードから、次の商品カード・記事カード・見出しまでの字数で見ます。
+    // （商品名の見出しを置かない書き方なので、見出しでは区切れません）
+    const secs = String(text).split(/^\{\{product:[^}]*\}\}\s*$/m).slice(1);
     const longOnes = secs.filter((sec) => {
-      if (!/\{\{product:/.test(sec)) return false;
-      const body = sec.split('\n').slice(1).join('\n')
+      const body = sec.split(/^(#{2,4}\s|\{\{(product|card):)/m)[0]
         .replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, '');
       return body.length > 260;
     }).length;
