@@ -57,7 +57,7 @@ function workPaths(project) {
 // あえて1行だけ入れて「これを Edit で置き換える」形にしています。
 const PLACEHOLDER = '<!-- ここに記事を書きます -->';
 
-function buildPrompt(mode, project, instruction, brief, body) {
+function buildPrompt(mode, project, instruction, brief, body, meta) {
   const w = workPaths(project);
   fs.writeFileSync(w.article, mode === 'write' ? PLACEHOLDER + '\n' : (body || ''), 'utf8');
   if (mode === 'write') fs.writeFileSync(w.brief, brief, 'utf8');
@@ -112,7 +112,30 @@ function buildPrompt(mode, project, instruction, brief, body) {
     '※ 指示に関係のない箇所は、一字も変更しないでください。',
     '※ Write ツールは使わないでください。Edit ツールだけを使ってください。',
     `※ ${w.rel(w.article)} 以外のファイルは変更しないでください。`,
+    '',
+    // タイトル・説明文・タグは本文の外（アプリの「公開の設定」）にあります。
+    // ここを伝えないと、頼まれても書く場所が無く、何も変えずに終わってしまいます。
+    '【タイトル・説明文・タグを頼まれたとき】',
+    'これらは本文ではなく、アプリの「公開の設定」で管理しています。いまの値は次のとおりです。',
+    `  title: ${(meta && meta.title) || '（未設定）'}`,
+    `  description: ${(meta && meta.description) || '（未設定）'}`,
+    `  tags: ${metaTags(meta) || '（未設定）'}`,
+    `頼まれたときは、${w.rel(w.article)} のいちばん先頭（1行目の直前）に、次の形で書き足してください。`,
+    'アプリが読み取って「公開の設定」に入れます。頼まれていない項目の行は書かないでください。',
+    '',
+    '---',
+    'title: 記事タイトル',
+    'description: 説明文（80〜120字。記事で分かることを具体的に）',
+    'tags: [タグ1, タグ2, タグ3]',
+    '---',
+    '',
+    '本文の直しを頼まれていなければ、本文は一字も変えないでください。',
   ].join('\n');
+}
+
+function metaTags(meta) {
+  const t = meta && meta.tags;
+  return Array.isArray(t) ? t.join(', ') : String(t || '');
 }
 
 // よくある失敗を、何をすればいいか分かる日本語にする
@@ -273,9 +296,19 @@ function startClaude(jobId, prompt, model, opts) {
     }
 
     const warnings = [];
-    if (job.suggested && (job.suggested.title || job.suggested.description)) {
-      warnings.push('AIがタイトルや説明文の案も書いていました。'
-        + '「公開の設定」で使えるので、結果の下を見てください。');
+    const hasSuggest = !!(job.suggested
+      && (job.suggested.title || job.suggested.description || job.suggested.tags));
+    if (hasSuggest) {
+      warnings.push('AIがタイトル・説明文・タグの案を書きました。'
+        + '結果の下の「公開の設定に入れる」から使えます。');
+    }
+    // 本文はそのままで、タイトルや説明文・タグだけを書いた場合。
+    // 頼まれたのが公開の設定だけなら、これで正しく終わっています。
+    if (job.baseText && text.trim() === job.baseText.trim() && hasSuggest) {
+      job.status = 'done';
+      job.article = job.baseText;
+      job.warnings = warnings.concat(['本文は変更していません。']);
+      return;
     }
     // ファイルが1文字も変わっていない＝AIが編集しなかった
     if (job.baseText && text === job.baseText) {

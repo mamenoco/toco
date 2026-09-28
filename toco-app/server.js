@@ -832,7 +832,7 @@ const server = http.createServer(async (req, res) => {
       if (body.mode === 'write') registerPicked(pr);   // 商品IDを確定させてから書かせる
       const brief = body.mode !== 'write' ? ''
         : (kind.isColumn(pr) ? buildColumnBrief(pr, columnMentions(pr)) : buildBrief(pr, db.inventory));
-      const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current);
+      const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current, metaOf(pr));
       const jobId = DB.newId();
       claude.startClaude(jobId, prompt, settings.aiModel, {
         // 進捗の目安。書き直しは元の長さ、新規は記事1本ぶんの目安を使います。

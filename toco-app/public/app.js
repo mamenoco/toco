@@ -1044,7 +1044,7 @@ function aiPoll() {
       // AIがタイトルや説明文の案も書いていたら、ここから公開設定に入れられるようにします
       AI_SUGGESTED = r.suggested || null;
       const box = $('#aiSuggest');
-      if (AI_SUGGESTED && (AI_SUGGESTED.title || AI_SUGGESTED.description)) {
+      if (AI_SUGGESTED && (AI_SUGGESTED.title || AI_SUGGESTED.description || AI_SUGGESTED.tags)) {
         box.style.display = '';
         box.innerHTML = '<h3 style="margin-top:14px">AIが書いたタイトル・説明文の案</h3>'
           + '<table class="tbl"><tbody>'
