@@ -700,8 +700,11 @@ function cardResolvers(ctx) {
     const a = ctx.bySlug[slug];
     if (!a) return '<!-- 記事が見つかりません: ' + esc(slug) + ' -->';
     if (a.status !== 'publish') {
-      return '<div class="link-todo-card">' + esc(a.title)
-        + '（下書きのため、公開されるとカードが出ます）</div>';
+      // 送り先がまだ下書き。読者には何も出さず、アプリのプレビューでだけ知らせます。
+      // 公開されれば、次に書き出したときに自動でカードになります。
+      return (sec && sec.preview)
+        ? '<div class="link-todo-card">' + esc(a.title) + '（下書きのため、公開されるとカードが出ます）</div>'
+        : '';
     }
     if (inSection(sec).has(slug)) {
       // 同じ節にもう出ています。読者には出さず、アプリのプレビューでだけ知らせます。
