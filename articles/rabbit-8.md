@@ -1,5 +1,5 @@
 ---
-title: うさぎの軟便や下痢の原因と対処
+title: うさぎの軟便や下痢には要注意？原因と対処法について詳しく解説
 slug: rabbit-8
 category: column
 tags: [軟便, 下痢, うんち, 健康管理]
