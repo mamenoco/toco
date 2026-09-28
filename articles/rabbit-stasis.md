@@ -1,5 +1,5 @@
 ---
-title: うさぎのうっ滞のサインと対処
+title: うさぎのうっ滞とは？サインと対処法について詳しく解説
 slug: rabbit-stasis
 category: column
 tags: [うっ滞, 健康管理, 換毛期, 牧草]
