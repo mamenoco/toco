@@ -958,13 +958,25 @@ function buildExtras(published, ctx, extra) {
   write('404.html', layout({ path: '/404.html', title: 'ページが見つかりませんでした', noindex: true, content: notFound, ...ctx }));
 
   // sitemap.xml
-  const urls = ['/'].concat(published.map((a) => `/${a.slug}/`))
-    .concat((extra && extra.pages || []).map((p) => `/${p.slug}/`))
-    .concat(config.categories.map((c) => `/category/${c.slug}/`))
-    .concat(((extra && extra.tags) || []).filter((t) => t.indexable).map((t) => t.url));
+  // 更新日（lastmod）を入れておくと、記事を直したときにクローラーが気づきやすくなります。
+  // 記事は updated、無ければ公開日。一覧ページは、そこに載っている記事のうち最も新しい日付です。
+  const day = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '');
+  const artDay = (a) => day(a.updated) || day(a.date);
+  const newest = (list) => list.map(artDay).filter(Boolean).sort().pop() || '';
+
+  const urls = [{ loc: '/', lastmod: newest(published) }]
+    .concat(published.map((a) => ({ loc: `/${a.slug}/`, lastmod: artDay(a) })))
+    .concat(((extra && extra.pages) || []).map((p) => ({ loc: `/${p.slug}/`, lastmod: artDay(p) })))
+    .concat(config.categories.map((c) => ({
+      loc: `/category/${c.slug}/`,
+      lastmod: newest(published.filter((a) => a.category === c.slug)),
+    })))
+    .concat(((extra && extra.tags) || []).filter((t) => t.indexable)
+      .map((t) => ({ loc: t.url, lastmod: newest(t.list) })));
   write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-    + urls.map((u) => `  <url><loc>${config.url}${u}</loc></url>`).join('\n')
+    + urls.map((u) => `  <url><loc>${config.url}${u.loc}</loc>`
+      + (u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : '') + '</url>').join('\n')
     + '\n</urlset>\n');
 
   // robots.txt
