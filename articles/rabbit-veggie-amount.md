@@ -1,5 +1,5 @@
 ---
-title: うさぎの食べてよい野菜・果物の量と、市販品の選び方
+title: うさぎが食べてよい野菜や果物は？あげる量と市販品の選び方について解説
 slug: rabbit-veggie-amount
 category: column
 tags: [野菜, 量の目安, 乾燥野菜, 与え方]
