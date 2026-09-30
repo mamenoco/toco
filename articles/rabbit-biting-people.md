@@ -1,5 +1,5 @@
 ---
-title: うさぎが人を噛む理由と、噛まれたときの接し方
+title: うさぎが人を噛むのはなぜ？理由と噛まれたときの接し方を解説
 slug: rabbit-biting-people
 category: column
 tags: [噛み癖, しつけ, うさぎの気持ち]
