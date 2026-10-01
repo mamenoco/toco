@@ -184,8 +184,8 @@ function pickupCard(a, withBadge) {
 </article>`;
 }
 
-// トップの「カテゴリの新着」の棚。カテゴリごとに新しい順で10件を横スライドで
-const SHELF_SIZE = 10;
+// トップの「カテゴリの新着」の棚。カテゴリごとに新しい順で15件を横スライドで
+const SHELF_SIZE = 15;
 
 function shelvesHtml(published) {
   // コラムは下に専用の枠があるので、ここには並べません。
