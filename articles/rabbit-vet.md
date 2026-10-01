@@ -1,5 +1,5 @@
 ---
-title: うさぎの動物病院の探し方
+title: うさぎの動物病院の探し方｜お迎え前にチェックしておこう
 slug: rabbit-vet
 category: column
 tags: [動物病院, 病院探し, 健康管理, 初心者]
