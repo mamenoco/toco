@@ -1,5 +1,5 @@
 ---
-title: 部屋んぽのあとケージに戻らないとき
+title: 部屋んぽのあとケージに戻らない！原因と対処法をご紹介
 slug: rabbit-back-to-cage
 category: column
 tags: [部屋んぽ, しつけ, サークル, おやつ]
