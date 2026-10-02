@@ -27,6 +27,23 @@ function firstArticle(m) {
   return { slug: a.slug || 'スラッグ', title: a.title || '記事名' };
 }
 
+// 検索で上位にいる記事の見出し。ここに挙がっている論点は落とさず、そのうえで上回る材料を足してもらいます。
+// 見出しの言い回しや文章は写さないこと（内容を確かめるための一覧です）。
+function serpSection(project) {
+  const list = (project.ideaSerp || []).filter((x) => x && x.title);
+  if (!list.length) return [];
+  const L = ['## 検索上位の記事（この記事で上回る相手）', ''];
+  L.push('同じキーワードで上位にいる記事です。下の論点は**すべて扱ったうえで**、CLAUDE.md「2-3. 検索で上位を取るための書き方」の材料で上回ってください。');
+  L.push('見出しの言い回し・順番・文章は写さないこと。論点の抜け漏れを確かめるための一覧です。');
+  L.push('');
+  list.forEach((x) => {
+    L.push(`- ${x.title}${x.url ? `（${x.url}）` : ''}`);
+    (x.headings || []).forEach((h) => L.push(`  - ${h}`));
+  });
+  L.push('');
+  return L;
+}
+
 function buildColumnBrief(project, mentions) {
   const L = [];
   L.push(`# 執筆用ブリーフ（コラム）：${project.title || project.keyword}`);
@@ -41,6 +58,7 @@ function buildColumnBrief(project, mentions) {
   L.push(`- 作成日：${today()}`);
   if (project.ideaNote) L.push(`- この記事のねらい：${project.ideaNote}`);
   L.push('');
+  serpSection(project).forEach((x) => L.push(x));
   L.push('## コラムの役目');
   L.push('');
   L.push('この記事は、まだ商品を買う気になっていない読者が読む入り口です。');
@@ -114,6 +132,7 @@ function buildBrief(project, inventory, styleGuide) {
   L.push(`- 作成日：${today()}`);
   if (project.ideaNote) L.push(`- この記事のねらい：${project.ideaNote}`);
   L.push('');
+  serpSection(project).forEach((x) => L.push(x));
   L.push('## 守るルール');
   L.push('');
   L.push('プロジェクト直下の CLAUDE.md（スタイルガイド）に従ってください。とくに以下。');

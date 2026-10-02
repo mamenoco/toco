@@ -804,10 +804,10 @@ const server = http.createServer(async (req, res) => {
       if (kind.isColumn(pr)) {
         // コラムは、すでに公開ずみの記事で紹介している商品から選びます。
         // 楽天の検索も口コミの取得も通らないので、登録の処理は要りません。
-        md = buildColumnBrief(pr, columnMentions(pr));
+        md = buildColumnBrief(withSerp(pr), columnMentions(pr));
       } else {
         registerPicked(pr);        // 先にIDを確定させてからブリーフに書く
-        md = buildBrief(pr, db.inventory);
+        md = buildBrief(withSerp(pr), db.inventory);
       }
       const dir = path.join(ROOT, '..', 'articles', 'briefs');
       fs.mkdirSync(dir, { recursive: true });
@@ -831,7 +831,7 @@ const server = http.createServer(async (req, res) => {
 
       if (body.mode === 'write') registerPicked(pr);   // 商品IDを確定させてから書かせる
       const brief = body.mode !== 'write' ? ''
-        : (kind.isColumn(pr) ? buildColumnBrief(pr, columnMentions(pr)) : buildBrief(pr, db.inventory));
+        : (kind.isColumn(pr) ? buildColumnBrief(withSerp(pr), columnMentions(pr)) : buildBrief(withSerp(pr), db.inventory));
       const prompt = claude.buildPrompt(body.mode, pr, body.instruction || '', brief, current, metaOf(pr));
       const jobId = DB.newId();
       claude.startClaude(jobId, prompt, settings.aiModel, {
@@ -1317,6 +1317,13 @@ function syncIdeas(db) {
     }
   });
   return changed;
+}
+
+// 記事ネタに付けておいた「検索上位の記事」を、ブリーフに渡せるようにします。
+// 記事を作りはじめたあとでネタに付け足した場合も拾えるよう、作るたびにネタから引きます。
+function withSerp(pr) {
+  const idea = pr && pr.ideaId ? (db.ideas || []).find((x) => x.id === pr.ideaId) : null;
+  return idea && idea.serp ? Object.assign({}, pr, { ideaSerp: idea.serp }) : pr;
 }
 
 // コラムで触れる商品の情報をそろえます。
