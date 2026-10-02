@@ -1,5 +1,5 @@
 ---
-title: うさぎの健康チェックと健康診断
+title: うさぎの健康チェックと健康診断｜毎日チェックする内容をご紹介
 slug: rabbit-health-check
 category: column
 tags: [健康診断, 健康チェック, 体重管理, 動物病院]
