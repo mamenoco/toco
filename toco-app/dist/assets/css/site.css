@@ -103,7 +103,14 @@
 .entry-content ol li::before {
   content: counter(toco);
   position: absolute;
-  top: .3em; left: 0;
+  /* 丸の中心を、1行目の中心に合わせています。
+     本文の1行の高さは 2.05em。この ::before は親の .75倍の文字サイズなので、
+     ここでの 1em は親の .75em にあたります。
+       1行の高さ … 2.05 ÷ .75 = 2.733em
+       丸の直径 … 1.4em
+       上の余白 … (2.733 - 1.4) ÷ 2 = .667em
+     文字サイズが変わっても、emのままなので比率は崩れません。 */
+  top: .667em; left: 0;
   width: 1.4em; height: 1.4em;
   display: grid; place-items: center;
   border-radius: 50%;
