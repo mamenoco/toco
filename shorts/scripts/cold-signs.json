@@ -1,0 +1,15 @@
+{
+  "title": "うさぎが寒がっているときの5つのサイン",
+  "article": "rabbit-cold-signs",
+  "slides": [
+    { "type": "hook", "label": "寒がっているサイン5つ", "text": "このしぐさ\n寒がっている\nサインかも", "rabbit": "01", "sec": 3 },
+    { "type": "point", "num": 1, "text": "体を丸めて\n手足をしまったまま\n動かない", "rabbit": "03", "sec": 3.5 },
+    { "type": "point", "num": 2, "text": "耳が\nひんやり冷たい", "sub": "毎日なでるときに\n耳に一度手を添えてみて", "rabbit": "07", "sec": 4 },
+    { "type": "point", "num": 3, "text": "水を飲む量が\n減っている", "rabbit": "02", "sec": 3.5 },
+    { "type": "point", "num": 4, "text": "うんちが\n小さくなる", "rabbit": "04", "sec": 3.5 },
+    { "type": "point", "num": 5, "text": "ぶるっと\n体を震わせる", "sub": "ここまで来たら\n部屋の温度が足りていません", "rabbit": "05", "sec": 4 },
+    { "type": "tip", "label": "まずやること", "text": "ケージの高さで\n室温をはかる", "sub": "目安は18〜24度\n床の近くは数度低いことも", "rabbit": "06", "sec": 4.5 },
+    { "type": "care", "text": "食欲がない・じっと動かない\nときは早めに動物病院へ", "rabbit": "08", "sec": 3.5 },
+    { "type": "end", "text": "寒さ対策は\ntocoとくらしで", "sub": "プロフィールのリンクから", "rabbit": "01", "sec": 3.5 }
+  ]
+}
